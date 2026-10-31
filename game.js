@@ -162,7 +162,7 @@
   const overview = () => Math.min(cw / 1440, (ch - 80) / 640);     // celá scéna
   const minS = () => overview() * 0.9, maxS = () => Math.max(overview() * 3.2, 1.2);
   // y světa GY+70 leží na této výšce obrazovky
-  const anchorY = () => portrait() ? Math.min(ch - 40, ch * 0.5 + cam.s * 330) : ch;
+  const anchorY = () => portrait() ? Math.min(ch - 40, ch * 0.72 + cam.s * 70) : ch;   // zem asi ve 72 % výšky
   function clampCam(x, s) {
     s = clamp(s, minS(), maxS());
     const half = cw / (2 * s);
