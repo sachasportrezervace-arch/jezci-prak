@@ -163,7 +163,7 @@ Nové události (tečkový zápis jako dosud): `j.id.t.dx.dy` úskok, `r.t.x.y` 
 - „Stavět můžeš nejvýš třikrát za partii a nikdy dvakrát po sobě.“
 - „Ježek, kterého nevystřelíš, ti zůstane na příští tah.“
 - „Tlusťoch odráží ježky.“ · „Štítonoš zastaví zásahy zepředu, dokud štít drží.“ · „Skokan třikrát uskočí před ježkem.“ · „Léčitel ti na začátku tahu vyléčí 6 životů.“ · „Špičák prorazí štít.“
-- „Po devátém tahu každého vyhrává ten, kdo má zdravějšího krále.“
+- „Po osmém tahu každého vyhrává ten, kdo má zdravějšího krále.“
 
 ## 9. Vyvažovací plán
 Ladí se: `KING_HP 60`, `CRITTER_HP 30`, `TUNE.dmg/blk 0,15`, HP jednotek (T 50, S 34 + štít 45, R 18, L 24), `T` odraz 0,8 a ×0,6, léčení 6/zásoba 24/dosah 170, úskok 70 px/Δv/3×, ježci (tabulka 4), stavební zásoba 3/4, limit 9 tahů, váhy materiálů, `BOOM_R`.

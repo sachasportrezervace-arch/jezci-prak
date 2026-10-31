@@ -23,7 +23,7 @@
   const FORT = { ax: [74, 170, 266, 362], cell: 96, slab: 22, pitch: 118 };
 
   // ladění (sekce 9 designu): násobky poškození z nárazů pro jednotky a kostky
-  const TUNE = { dmg: 0.42, blk: 1, kingCap: 0.55 };
+  const TUNE = { dmg: 0.42, blk: 1, kingCap: 0.43 };
 
   // materiály
   const MAT = {
@@ -45,7 +45,7 @@
   };
   // jednotky: r = kruh, w×h = obdélník (Štítonoš); hp životy; z = zásoba (štít, úskoky, léčení)
   const UNIT = {
-    K: { r: 24, d: 0.0013, hp: 60 },              // král
+    K: { r: 24, d: 0.0013, hp: 70 },              // král
     C: { r: 19, d: 0.0012, hp: 30 },              // strážník
     T: { r: 30, d: 0.0022, hp: 50 },              // tlusťoch (odráží ježky)
     S: { w: 30, h: 50, d: 0.0014, hp: 34, z: 45 },// štítonoš (štít zepředu)
@@ -55,6 +55,7 @@
   const UNIT_ORDER = "KSTLRC";
   const isUnit = k => k.length === 1 && !!UNIT[k];
   const KING_HP = UNIT.K.hp, CRITTER_HP = UNIT.C.hp;
+  const KING_FALL = 35;   // pád krále na zem: újma místo vyřazení (partie 4–8 min, playtest 31. 10.: král padal 1.–3. ranou)
   const T_BOUNCE = 0.8, T_DMG = 0.6;
   const DODGE = { d: 70, vx: 3.2, vy: -5.5, edge: 40, speed: 5 };
   const HEAL = { amount: 6, range: 170 };
@@ -187,7 +188,9 @@
       nextId = Math.max(nextId, s.id + 1);
     }
     let hog = null, tick = 0, calm = 0, done = false, limit = MAX_TICKS, hogIdle = 0;
-    const ev = [], doomed = new Set(), last = new Map(), frames = [];
+    const ev = [], doomed = new Set(), last = new Map(), frames = [], kingFell = new Set(), kingHit = new Map();
+    // král, který už leží na zemi, za další dopad nic neztrácí (pád platí jen při shození z pevnosti)
+    for (const [id, it] of items) if (it.k === "K" && groundAt(env.map, it.b.position.x) - it.b.position.y < UNIT.K.r + 8) kingFell.add(id);
     let every = opt.every || (items.size > 60 ? 3 : 2);
     const emit = e => { ev.push(e); if (opt.onEvent) opt.onEvent(e); };
 
@@ -207,7 +210,7 @@
     // zásah jednotky: štít Štítonoše zepředu, ×0,6 od ježka na Tlusťocha, strop jedné rány na krále
     function hitUnit(it, id, d, sp, src) {
       if (it.k === "T" && src === "hog") d *= T_DMG;
-      if (it.k === "K" && src !== "fall") d = Math.min(d, KING_HP * TUNE.kingCap);
+      if (it.k === "K" && src !== "fall") { const used = kingHit.get(id) || 0; d = Math.max(0, Math.min(d, KING_HP * TUNE.kingCap - used)); kingHit.set(id, used + d); }   // strop zásahů krále na celou akci
       if (it.k === "S" && it.z > 0) {
         const dir = it.t === "x" ? 1 : -1, front = (sp.x - it.b.position.x) * dir > 8;
         if (front || src === "boom") {
@@ -229,7 +232,10 @@
         const sp = p.collision.supports[0] || A.position;
         // jednotka na zemi = spadla
         for (const [X, Y] of [[A, B], [B, A]]) {
-          if (isUnit(X.label) && Y.label === "ground") damage(X.plugin.id, 999, X.position.x, X.position.y);
+          if (!isUnit(X.label) || Y.label !== "ground") continue;
+          // král pád na zem přežije s újmou (jednou za akci), ostatní jednotky vypadnou
+          if (X.label === "K") { if (!kingFell.has(X.plugin.id)) { kingFell.add(X.plugin.id); damage(X.plugin.id, KING_FALL, X.position.x, X.position.y); } }
+          else damage(X.plugin.id, 999, X.position.x, X.position.y);
         }
         // Tlusťoch odrazí ježka (ne kamenného ani špičáka): normálová složka se po řešení srážky nastaví na −0,8× původní
         if (hog && !bounce && (A === hog || B === hog)) {
@@ -470,7 +476,7 @@
 
   // ---------- pravidla partie (čisté funkce nad stavem, sdílí je hra i simulace v testech) ----------
   // turns: tahů na hráče; builds: zásoba staveb [začínající, druhý]; buildFrom: stavět nejdřív v tomto tahu hráče
-  const RULES = { turns: 9, builds: [3, 4], buildFrom: 2, comebackKing: 0.35, comebackUnits: 2 };
+  const RULES = { turns: 8, builds: [3, 4], buildFrom: 2, comebackKing: 0.35, comebackUnits: 2 };
   const other = t => t === "x" ? "o" : "x";
   const kingFrac = (bs, t) => { const k = kingOf(bs, t); return k ? Math.max(0, k.hp) / KING_HP : 0; };
   const turnNo = n => Math.floor(n / 2) + 1;                       // kolikátý tah má hráč na tahu (n = počet odehraných akcí)

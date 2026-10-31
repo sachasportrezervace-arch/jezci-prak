@@ -27,6 +27,7 @@ const modN = i => !i.md ? "bez" : i.md === "v" ? `vítr ${i.wd > 0 ? "→" : "�
   const A = await (await bA.newContext({ viewport: { width: 1366, height: 820 } })).newPage();
   const B = await (await bB.newContext({ ...devices["iPhone 13"], viewport: { width: 390, height: +process.env.BH || 844 } })).newPage();
   const errs = [];
+  global.PAGES = { A, B };
   for (const [n, p] of [["A", A], ["B", B]]) p.on("pageerror", e => errs.push(n + ": " + e.message));
   const shot = (p, n) => p.screenshot({ path: path.join(SHOTS, n + ".png") });
   const hideBanner = async p => { if (await p.locator("#banner").isVisible()) await p.click("#banner").catch(() => {}); };
@@ -59,7 +60,7 @@ const modN = i => !i.md ? "bez" : i.md === "v" ? `vítr ${i.wd > 0 ? "→" : "�
       await hideBanner(P);
       let ip = await info(P);
       const n0 = ip.n, tTurn = now();
-      const myKing = ip.king[me] / 60;
+      const myKing = ip.king[me] / 70;
       const canBuild = await P.evaluate(() => document.getElementById("modeBuild").getAttribute("aria-disabled") !== "true");
       const wantBuild = canBuild && ((myKing < 0.6 && Math.random() < 0.6) || Math.random() < 0.15);
       let kind = "s", detail = "";
@@ -97,6 +98,17 @@ const modN = i => !i.md ? "bez" : i.md === "v" ? `vítr ${i.wd > 0 ? "→" : "�
         await P.mouse.move(sx + dx, sy + dy);
         detail = ip.hd[me];
         await P.mouse.up();
+        // ověř, že ježek opravdu vyletěl; jinak záznam a jeden nový pokus (kamera se mohla ještě dorovnávat)
+        const went = await P.waitForFunction(n => { const i = window.JPT.info(); return i.acting || i.n > n; }, n0, { timeout: 4000, polling: 50 }).then(() => true, () => false);
+        if (!went) {
+          const sl2 = await P.evaluate(() => ({ sling: window.JPT.sling(), cam: window.JPT.cam(), status: document.getElementById("status").textContent }));
+          console.log("NEVYSTRELIL " + JSON.stringify({ hra: g, tah: turns + 1, kdo: nm, sling0: [sx, sy], dx, dy, ...sl2 }));
+          await shot(P, `nevystrelil-${g}-${turns}`);
+          const [tx, ty] = sl2.sling;
+          await P.mouse.move(tx, ty); await P.mouse.down();
+          for (let i = 1; i <= 12; i++) { await P.mouse.move(tx + dx * i / 12, ty + dy * i / 12); await sleep(40); }
+          await P.mouse.up();
+        }
         if (g === 1 && turns < 3) { await sleep(1300); await shot(P, `p${g}3-let-${nm}-${turns}`); }
       }
       await P.waitForFunction(n => { const i = window.JPT.info(); return i.n > n && !i.busy && !i.acting; }, n0, { timeout: 120000, polling: 50 });
@@ -114,7 +126,9 @@ const modN = i => !i.md ? "bez" : i.md === "v" ? `vítr ${i.wd > 0 ? "→" : "�
         await P.click(`#kinds [data-k="${want}"]`);
         await P.click("#sendBtn");
         await P.waitForFunction(() => { const i = window.JPT.info(); return i.ph !== "pick" && !i.busy; }, null, { timeout: 60000, polling: 50 });
-        row.poslal = want;
+        const tSync = now();
+        await O.waitForFunction(() => { const i = window.JPT.info(); return i.ph !== "pick" && !i.replay; }, null, { timeout: 60000, polling: 50 });
+        row.poslal = want; row.syncS = +((now() - tSync) / 1000).toFixed(1);
       }
       row.celkemS = +((now() - tTurn) / 1000).toFixed(1);
       rows.push(row); console.log(JSON.stringify(row));
@@ -125,7 +139,7 @@ const modN = i => !i.md ? "bez" : i.md === "v" ? `vítr ${i.wd > 0 ? "→" : "�
     await B.waitForFunction(() => { const i = window.JPT.info(); return i.ph === "end" && !i.replay && !i.acting; }, null, { timeout: 120000 });
     const fa = await info(A), min = (now() - t0) / 60000;
     const sum = { hra: g, mapa: MAPN[fa.map] || fa.map, modifikator: modN(fa), seed: fa.sd, tahu: rows.length, vystrelu: rows.filter(r => r.akce === "střela").length, staveb: rows.filter(r => r.akce === "stavba").length,
-      minut: +min.toFixed(1), vitez: fa.win === "x" ? "Mark" : fa.win === "o" ? "Radka" : "remíza", jak: { k: "král padl", l: "po 9. tahu", r: "vzdání" }[fa.wy] || fa.wy,
+      minut: +min.toFixed(1), vitez: fa.win === "x" ? "Mark" : fa.win === "o" ? "Radka" : "remíza", jak: { k: "král padl", l: "po 8. tahu", r: "vzdání" }[fa.wy] || fa.wy,
       comeback: rows.filter(r => r.cb).map(r => r.cb).join(","), leceni: rows.reduce((s, r) => s + r.hl, 0), serie: fa.w.join(":"), tituly: fa.tt };
     games.push({ sum, rows });
     console.log("PARTIE " + JSON.stringify(sum));
@@ -143,4 +157,12 @@ const modN = i => !i.md ? "bez" : i.md === "v" ? `vítr ${i.wd > 0 ? "→" : "�
   fs.writeFileSync(path.join(__dirname, "out", (process.env.GAME || "playtest") + ".json"), JSON.stringify({ games, errs }, null, 1));
   await bA.close(); await bB.close();
   process.exit(errs.length ? 1 : 0);
-})().catch(e => { console.error(e); process.exit(2); });
+})().catch(async e => {
+  console.error(e.message.split("\n")[0]);
+  for (const [n, p] of Object.entries(global.PAGES || {})) {
+    const d = await p.evaluate(() => ({ title: document.title, status: document.getElementById("status").textContent, info: window.JPT && window.JPT.info() })).catch(x => x.message);
+    console.error(n, JSON.stringify(d));
+    await p.screenshot({ path: path.join(SHOTS, "chyba-" + n + ".png") }).catch(() => {});
+  }
+  process.exit(2);
+});

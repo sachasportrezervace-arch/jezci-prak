@@ -84,6 +84,8 @@
     cw = innerWidth; ch = innerHeight;
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
     cam.resize(cw, ch);
+    // desktop: lišta tahu je jen mezi oběma praky (jinak zakrývá napnutého ježka v praku)
+    document.documentElement.style.setProperty("--dock-w", Math.round((SLING.o.x - SLING.x.x - 44) * cam.overview()) + "px");
     if ($("viewLbl")) syncView();
   }
   const portrait = () => cam.portrait();
@@ -109,11 +111,23 @@
   // výchozí pohled; při stavbě přiblížení na vlastní pevnost nad lištou
   function restView() {
     if (building() && !portrait()) {
-      const dock = $("dock").getBoundingClientRect(), side = dock.left > cw * 0.55;   // na šířku je lišta vpravo, na desktopu dole
-      const room = side ? ch - 40 : Math.max(200, dock.top - 30), s = clamp(Math.min((side ? dock.left - 40 : cw - 80) / 520, (room - 60) / 480), overview(), 2.2);
-      const cx = me === "x" ? 250 : W - 250;
-      const ground = GY + 70;
-      return { x: cx, s, y: side ? -40 / s : -(ch - room) / s + 20 / s + (ground - GY) * 0 };
+      // na šířku je lišta u okraje (tým x vpravo, tým o vlevo), na desktopu dole; pevnost s prakem se vejde do volného místa vedle ní
+      const dock = $("dock").getBoundingClientRect(), right = dock.left > cw * 0.55, left = dock.right < cw * 0.45, side = right || left;
+      const x0 = left ? dock.right + 12 : 8, x1 = right ? dock.left - 12 : cw - 8;
+      const fx = me === "x" ? 255 : W - 255;                 // střed pevnosti a praku ve světě
+      if (side) {
+        // na šířku: celá zóna stavby (do výšky BUILD_H) mezi horním HUD a spodním okrajem, zem těsně u spodku
+        const hud = $("status").hidden ? $("plateX").getBoundingClientRect().bottom : $("status").getBoundingClientRect().bottom, top = hud + 8;
+        const zTop = PY - JP.BUILD_H - 12, s = clamp(Math.min((x1 - x0) / 520, (ch - 10 - top) / (GY + 8 - zTop)), overview() * 0.8, 2.2);
+        return { x: fx - ((x0 + x1) / 2 - cw / 2) / s, s, y: (top - ch) / s - (zTop - GY - 70) };
+      }
+      const room = Math.max(200, dock.top - 30), s = clamp(Math.min((x1 - x0) / 520, (room - 60) / 480), overview(), 2.2);
+      return { x: fx - ((x0 + x1) / 2 - cw / 2) / s, s, y: -(ch - room) / s + 20 / s };
+    }
+    if (building() && portrait()) {
+      // na výšku při stavbě: celá vlastní pevnost od kraje (12 px), prak smí vyjet z obrazovky
+      const s = cam.homeS(), half = cw / (2 * s), Z = JP.ZONE[me];
+      return { x: me === "x" ? Z[0] - 12 / s + half : Z[1] + 12 / s - half, s };
     }
     return cam.restView(viewTeam());
   }
@@ -155,10 +169,11 @@
   };
   function modUi(g) {
     if (!g || !g.md) return ["Klidný den", "Bez zvláštních podmínek, rozhoduje míření.", ""];
-    if (g.md === "v") { const dir = g.wd < 0 ? "doleva" : "doprava", n = Math.abs(g.wd); return [`Vítr ${n}`, `Fouká vítr ${dir} (síla ${n} ze 3) a stáčí ježka v letu.`, "v"]; }
-    if (g.md === "n") return ["Noc", "Noc: pevnosti osvětlují lucerny, pravidla platí stejně.", "n"];
-    if (g.md === "i") return ["Mráz", "Mráz: v pevnostech je víc ledu a led klouže.", "i"];
-    return ["Lehká gravitace", "Lehká gravitace: ježek letí delším a vyšším obloukem.", "g"];
+    // [název, popis bez názvu (karta partie je ukáže pod sebou), klíč]
+    if (g.md === "v") { const dir = g.wd < 0 ? "doleva" : "doprava", n = Math.abs(g.wd); return [`Vítr ${n}`, `Fouká vítr ${dir}, síla ${n} ze 3. Stáčí ježka v letu, směr ukazuje praporek u praku.`, "v"]; }
+    if (g.md === "n") return ["Noc", "Pevnosti osvětlují lucerny, pravidla platí stejně.", "n"];
+    if (g.md === "i") return ["Mráz", "V pevnostech je víc ledu a led klouže.", "i"];
+    return ["Lehká gravitace", "Ježek letí delším a vyšším obloukem.", "g"];
   }
   const SKY0 = "#86D9F2";
   function bg() {
@@ -352,8 +367,31 @@
     ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.lineCap = "round"; ctx.lineWidth = 3;
     for (let i = 0; i < 9; i++) {
       const span = W + 400, x = ((i * 211 + dir * t * sp) % span + span) % span - 200, y = 140 + (i * 71) % 420;
+      if (toScreen(x, y)[1] < 150) continue;   // pás pod horním HUD nechat čistý
       ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + dir * 40, y - 10, x + dir * 80, y); ctx.stroke();
     }
+  }
+  // praporek větru za prakem: vlaje po větru, síla = počet oranžových pruhů (1–3) a jak moc stojí vodorovně
+  function drawWindFlag(t, lw) {
+    const wd = env().wd || 0; if (!wd) return;
+    const dir = t === "x" ? 1 : -1, px = SLING[t].x - dir * 24, gy = groundAt(px), top = GY - 224;
+    const n = clamp(Math.abs(wd), 1, 3), wdir = Math.sign(wd), T = calm() ? 0 : animT;
+    const droop = [0, 0.6, 0.3, 0.07][n], L = 66, ca = Math.cos(droop), sa = Math.sin(droop);
+    const amp = calm() ? 0 : 2.2 + n * 1.2, fq = 5 + n * 2.2;
+    const mid = u => [px + wdir * L * u * ca, top + 14 + L * u * sa + Math.sin(T * fq - u * 6) * amp * u];
+    const half = u => 14 * (1 - u) + 4.5 * u;
+    const band = (u0, u1) => {
+      const N = 6, up = [], lo = [];
+      for (let i = 0; i <= N; i++) { const u = u0 + (u1 - u0) * i / N, [x, y] = mid(u), h = half(u); up.push([x, y - h]); lo.push([x, y + h]); }
+      ctx.beginPath(); up.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); for (let i = lo.length - 1; i >= 0; i--) ctx.lineTo(lo[i][0], lo[i][1]); ctx.closePath();
+    };
+    // tyč
+    rrect(ctx, px - 3.5, top - 4, 7, gy - top + 10, 3.5); ctx.fillStyle = "#C8925A"; ctx.fill(); outline(ctx, lw * 0.8);
+    // pruhy: první n oranžové, zbytek papírově bílé
+    for (let i = 0; i < 3; i++) { band(i / 3, (i + 1) / 3); ctx.fillStyle = i < n ? "#FF6A3D" : "#FFF8EA"; ctx.fill(); }
+    band(0, 1); ctx.lineJoin = "round"; outline(ctx, lw * 0.9);
+    for (let i = 1; i < 3; i++) { const u = i / 3, [x, y] = mid(u), h = half(u); ctx.beginPath(); ctx.moveTo(x, y - h); ctx.lineTo(x, y + h); ctx.lineWidth = lw * 0.6; ctx.strokeStyle = INK; ctx.stroke(); }
+    circle(ctx, px, top - 6, 6.5); ctx.fillStyle = "#FFD84A"; ctx.fill(); outline(ctx, lw * 0.8);
   }
   function drawFluff() {
     for (let i = 0; i < 12; i++) {
@@ -410,7 +448,8 @@
       } else { ctx.translate(b.x, b.y); ctx.rotate(b.a); drawBlock(ctx, b.k, lw, b.max ? 1 - b.hp / b.max : 0, b.id); }
       ctx.restore();
     }
-    drawBars(scene.bodies, lw);
+    if (!(ended() && !replay && !acting)) drawBars(scene.bodies, lw);   // po konci partie bez ukazatelů zdraví
+    if (E.md === "v") for (const t of ["x", "o"]) drawWindFlag(t, lw);
     if (scene.ghost) drawGhost(scene.ghost, lw);
     if (scene.dots) {
       scene.dots.forEach((p, i) => { circle(ctx, p[0], p[1], Math.max(2.4, 6.2 - i * 0.13)); ctx.fillStyle = `rgba(255,255,255,${1 - i / scene.dots.length * 0.75})`; ctx.fill(); ctx.lineWidth = lw * 0.5; ctx.strokeStyle = "rgba(43,22,56,.6)"; ctx.stroke(); });
@@ -625,6 +664,7 @@
   // ---------- stav ----------
   let st = null;            // partie (b = tělesa jako objekty)
   let room = null, me = null, view = "setup", busy = false, net = "", bootSeq = 0, starter = "o", shareKind = "new";
+  let solo = false;         // trénink proti botovi: jen lokálně, nic do mantledb, nepočítá se do série
   let acting = null;        // { sim, kind, base, … } – moje probíhající akce (výstřel nebo stavba)
   let replay = null;        // { acts, i, rp, t, final } – přehrávání soupeřova tahu
   let pendingDoc = null;
@@ -911,6 +951,7 @@
   // Střelec simuluje výstřel hned celý, zápis odešle okamžitě a vlastní tah si přehraje ze stejných snímků jako soupeř.
   function shoot(ang, pow) {
     const base = st, type = handOf(base, me);
+    store.set("jp-aimed", "1");
     beginAct(base.b);
     const sim = JP.sim(base.b, { env: env() });
     sim.launch(me, ang, pow, type);
@@ -1069,6 +1110,7 @@
   const sig = g => g ? [g.rv, g.id, g.x, g.o, g.s, g.n, g.p, g.ph, g.w.join(":"), g.r, g.k, g.kc, g.hd.x, g.hd.o, g.pl.x, g.pl.o, g.bs.x, g.bs.o, g.lb.x, g.lb.o, g.win].join("|") : "";
 
   async function commit(next, ok, conflictText, base = st) {
+    if (solo) return true;   // trénink: tah platí hned, nic se neodesílá
     busy = true; pollSeq++; render();
     let d;
     try { d = await loadDoc(room.id); }
@@ -1125,6 +1167,7 @@
     if (st && !ended() && st.n === 0 && bannerFor !== st.id) showBanner();
     render();
     remember();
+    botNext();
   }
 
   // ---------- dotazování ----------
@@ -1174,7 +1217,7 @@
   }
   function message() {
     const s = stake(st), host = me || "x";
-    return `${nameOf(st, host)} tě vyzývá na Ježkomet: střílíme z praku ježka na pevnosti a kdo první shodí soupeřova krále, vyhrává.${s ? " O co hrajeme: " + s.text : ""} Hrajeme oba na tomhle odkazu, bez registrace: ${linkFor()}`;
+    return `${nameOf(st, host)} tě vyzývá na Ježkomet: střílíme z praku ježka na pevnosti a kdo první srazí soupeřova krále, vyhrává.${s ? " O co hrajeme: " + s.text : ""} Hrajeme oba na tomhle odkazu, bez registrace: ${linkFor()}`;
   }
   function seriesAfter() { const w = [...st.w]; if (st.ph === "end" && (st.win === "x" || st.win === "o") && !st.old) w[st.win === "x" ? 0 : 1]++; return w; }
   function concedeText() {
@@ -1185,7 +1228,8 @@
     n: ["Obyčejný", "Poctivá rána do všeho."], k: ["Kamenný", "Těžký: boří a Tlusťoch ho neodrazí."], g: ["Gumový", "Skáče a odráží se od všeho."],
     b: ["Bouchací", "Při dopadu vybuchne."], s: ["Špičák", "Prorazí štít, letí rychle."],
   };
-  const PIECEUI = { mS: ["Štít", "Kovová clona, vydrží nejvíc."], sB: ["Blok", "Těžký kámen, ucpe díru."], wP: ["Trám", "Dlouhé dřevo na strop i můstek."] };
+  const PIECEUI = { mS: ["Štít", "kovový"], sB: ["Blok", "kamenný"], wP: ["Trám", "dřevěný"] };
+  const PIECEHELP = { mS: "kovová clona, vydrží nejvíc", sB: "těžký kámen, ucpe díru", wP: "dlouhé dřevo na strop i můstek" };
   const UNITUI = { K: "Král", S: "Štítonoš", T: "Tlusťoch", L: "Léčitel", R: "Skokan", C: "Strážník" };
 
   // ---------- vykreslení UI ----------
@@ -1270,12 +1314,14 @@
       if (h) { hi.src = hogIcon(h); hi.alt = `V ruce: ${HOGUI[h][0]}`; hi.title = `V ruce: ${HOGUI[h][0]}`; }
     }
     const w = ended() && !replay && !acting ? seriesAfter() : st.w;
-    $("score").innerHTML = `<b class="x">${w[0]}</b> : <b class="o">${w[1]}</b>`;
-    $("score").setAttribute("aria-label", `Série ${st.x} ${w[0]}, ${st.o} ${w[1]}`);
+    $("score").classList.toggle("solo", solo);
+    if (solo) { $("score").textContent = "Trénink"; $("score").setAttribute("aria-label", "Trénink proti botovi, nepočítá se do série"); }
+    else { $("score").innerHTML = `<b class="x">${w[0]}</b> : <b class="o">${w[1]}</b>`; $("score").setAttribute("aria-label", `Série ${st.x} ${w[0]}, ${st.o} ${w[1]}`); }
     $("turnNo").textContent = ended() ? "Konec" : `Tah ${Math.min(RULES.turns, JP.turnNo(st.n))}/${RULES.turns}`;
-    const [ml, , mk] = modUi(st);
+    const [ml, mt, mk] = modUi(st);
     $("modChip").hidden = !mk || st.old;
-    if (mk) { $("modLbl").textContent = ml; $("modChip").dataset.m = mk; $("modArrow").style.transform = `scaleX(${st.wd < 0 ? -1 : 1})`; $("modChip").title = modUi(st)[1]; }
+    $("hud").classList.toggle("mod", !!mk && !st.old);
+    if (mk) { $("modLbl").textContent = ml; $("modChip").dataset.m = mk; $("modArrow").style.transform = `scaleX(${st.wd < 0 ? -1 : 1})`; $("modChip").title = `${ml}: ${mt}`; $("modChip").setAttribute("aria-label", `${ml}: ${mt}`); }
     const turnP = ended() ? null : st.p;
     $("plateX").classList.toggle("turn", turnP === "x"); $("plateO").classList.toggle("turn", turnP === "o");
     // stav
@@ -1294,13 +1340,15 @@
     const waiting = !!me && !!freeSeat() && !ended();
     $("waitBox").hidden = !waiting || canAim() || picking() || building() || !!acting || !!aim;
     if (waiting) $("waitText").textContent = `${nameOf(st, opp)} ještě neotevřel(a) výzvu. Pošli odkaz do chatu.`;
-    $("hint").hidden = !canAim() || !!aim || !$("waitBox").hidden;
-    $("hint").textContent = portrait() ? "Chyť ježka v praku, táhni dozadu a pusť." : "Chyť ježka v praku, táhni dozadu a pusť. Jinde tažením posouváš scénu.";
+    // nápověda míření jen do prvního výstřelu na tomhle zařízení
+    $("hint").hidden = !canAim() || !!aim || !$("waitBox").hidden || !$("banner").hidden || store.get("jp-aimed") === "1";
+    $("hint").textContent = desktop() ? "Chyť ježka v praku, táhni dozadu a pusť. Jinde tažením posouváš scénu." : "Chyť ježka v praku, táhni dozadu a pusť.";
     if (!aim) $("meter").hidden = true;
     renderDock();
     cv.classList.toggle("aim", canAim() && !aim); cv.classList.toggle("aiming", !!aim); cv.classList.toggle("build", building());
     const showEnd = ended() && !replay && !acting;
     $("endBox").hidden = !showEnd;
+    $("hud").classList.toggle("ended", showEnd);
     if (showEnd) renderEnd();
     document.title = canAim() || building() ? "Jsi na tahu · Ježkomet" : picking() ? "Vybíráš ježka · Ježkomet" : ended() && !replay ? "Konec partie · Ježkomet" : "Ježkomet";
   }
@@ -1313,16 +1361,17 @@
     $("dock").hidden = !(turn || showPick);
     $("dock").classList.toggle("picking", showPick);
     $("dock").classList.toggle("building", turn && mode === "build");
+    $("dock").classList.toggle("lefty", me === "o"); $("hud").classList.toggle("lefty", me === "o");
     $("turnRow").hidden = !turn; $("pickRow").hidden = !showPick;
     if (showPick) renderPick();
     if (!turn) return;
     const h = handOf(st, me), [nm, inf] = HOGUI[h] || ["", ""];
     $("hdIcon").src = h ? hogIcon(h) : "";
     $("hdName").textContent = nm;
-    const from = st.n === 0 ? "První výstřel." : st.h[0] && st.h[0].by === me && st.h[0].kind === "b" ? "Zůstal ti z minula." : `Od soupeře (${nameOf(st, other(me))}).`;
+    const from = st.n === 0 ? "První výstřel." : st.lb[me] ? "Zůstal ti z minula." : `Od soupeře (${nameOf(st, other(me))}).`;
     $("hdInfo").textContent = `${from} ${inf}`;
     const why = buildBlock(st, me), left = st.bs[me];
-    $("modeShoot").setAttribute("aria-pressed", String(mode === "shoot"));
+    $("modeShoot").setAttribute("aria-pressed", String(mode === "shoot")); $("modeShoot").title = "Střelba: vystřel ježka z praku.";
     $("modeBuild").setAttribute("aria-pressed", String(mode === "build"));
     $("modeBuild").setAttribute("aria-disabled", String(!!why));
     $("modeBuild").classList.toggle("off", !!why);
@@ -1339,7 +1388,7 @@
           const b = document.createElement("button"); b.type = "button"; b.className = "btn piece"; b.dataset.k = k;
           const im = new Image(); im.src = pieceIcon(k); im.alt = ""; im.width = im.height = 40;
           const t = document.createElement("span"); t.className = "pt"; t.innerHTML = `<b>${PIECEUI[k][0]}</b><small>${PIECEUI[k][1]}</small>`;
-          const kb = document.createElement("kbd"); kb.textContent = String(i + 1);
+          const kb = document.createElement("kbd"); kb.textContent = String(i + 1); b.title = `${PIECEUI[k][0]}: ${PIECEHELP[k]} (klávesa ${i + 1})`;
           b.append(im, t, kb);
           b.addEventListener("click", () => choosePiece(k));
           box.appendChild(b);
@@ -1348,7 +1397,8 @@
       for (const b of box.children) b.setAttribute("aria-pressed", String(!!ghost && ghost.kind === b.dataset.k));
       const ok = !!ghost && ghost.ok;
       $("placeBtn").setAttribute("aria-disabled", String(!ok)); $("placeBtn").classList.toggle("off", !ok);
-      $("buildWhy").textContent = ghost ? (ok ? (portrait() ? "Táhni prstem, kam díl dát." : "Klikni nebo táhni, kam díl dát. R otočí, Enter postaví.") : ghost.why) : "";
+      // na telefonu stačí stav nahoře („Stavíš…“); bublina se ukáže jen s důvodem, proč díl nejde postavit
+      $("buildWhy").textContent = ghost ? (ok ? (desktop() ? "Klikni nebo táhni, kam díl dát. R otočí, Enter postaví." : "") : ghost.why) : "";
       $("buildWhy").classList.toggle("bad", !!ghost && !ok);
       $("rotBtn").disabled = !ghost || ghost.kind === "sB";
     }
@@ -1385,7 +1435,7 @@
 
   function renderEnd() {
     const s = stake(st);
-    $("endKicker").textContent = st.old ? "" : st.wy === "l" ? "Po devátém tahu rozhodl zdravější král." : st.wy === "r" ? "Partie skončila vzdáním." : st.win === "=" ? "Oba králové padli v jednom tahu." : "Král padl.";
+    $("endKicker").textContent = st.old ? "" : st.wy === "l" ? "Po osmém tahu rozhodl zdravější král." : st.wy === "r" ? (st.r && st.r === me ? "Vzdáno." : `${nameOf(st, st.r || other(st.win))} se vzdává.`) : st.win === "=" ? "Oba králové padli v jednom tahu." : "Král padl.";
     $("endKicker").hidden = !$("endKicker").textContent;
     $("endPrimary").hidden = !me; $("endPrimary").disabled = busy;
     if (st.old) {
@@ -1403,11 +1453,12 @@
     } else {
       const won = me && st.win === me, W_ = nameOf(st, st.win), L = nameOf(st, other(st.win));
       $("endTitle").textContent = !me ? `${W_} vyhrává!` : won ? "Vyhráváš!" : `${W_} vyhrává`;
-      if (st.r) $("endTitle").textContent += st.r === me ? " (vzdal(a) ses)" : ` (${L} to vzdal(a))`;
       $("endStake").textContent = s ? (!me ? s.third(W_, L) : won ? s.win(W_, L) : s.lose(W_, L)) : won ? "Pevnost padla, tvoji slaví." : "Příště to bude tvůj král, kdo vydrží.";
     }
     const w = seriesAfter();
     $("endSeries").textContent = `${st.x} ${w[0]} : ${w[1]} ${st.o}`;
+    $("endSeries").hidden = solo;
+    if (solo) { $("endRank").hidden = true; $("endPrimary").textContent = "Znovu"; $("endSecondary").textContent = "Vyzvat soupeře"; return; }
     // postup v sérii: nový titul
     let rank = "";
     if (st.win === "x" || st.win === "o") { const i = st.win === "x" ? 0 : 1, a = JP.titleOf(st.w[i]), b = JP.titleOf(w[i]); if (b && a !== b) rank = `${nameOf(st, st.win)} je teď ${b}.`; }
@@ -1432,7 +1483,8 @@
     const s = stake(st);
     $("introMeta").textContent = `Hraješ za ${TEAM[other(host)].name}. ` + (s ? `O co: ${s.text}` : "Hraje se pro radost.");
     const [mn, ms] = MAPUI[st.map] || MAPUI.h;
-    $("introMap").textContent = `${mn}. ${ms} ${modUi(st)[1]}`;
+    const [ml, mt, mk] = modUi(st);
+    $("introMap").textContent = `${mn}. ${ms} ${mk ? `${ml}: ${mt}` : mt}`;
     $("acceptBtn").disabled = busy;
   }
   // karta partie: mapa a modifikátor na začátku každé partie
@@ -1442,16 +1494,17 @@
     $("bnMap").textContent = mn; $("bnMapT").textContent = ms;
     $("bnMod").textContent = ml; $("bnModT").textContent = mt;
     $("bnModIcon").dataset.m = mk || "-";
-    $("bnStart").textContent = `Začíná ${nameOf(st, st.s)}.`;
+    $("bnStart").textContent = solo && st.s === me ? "Začínáš ty." : `Začíná ${nameOf(st, st.s)}.`;
     $("banner").hidden = false; $("banner").classList.remove("go"); void $("banner").offsetWidth; $("banner").classList.add("go");
     clearTimeout(showBanner.t); showBanner.t = setTimeout(hideBanner, calm() ? 6000 : 4200);
   }
-  function hideBanner() { $("banner").hidden = true; }
+  function hideBanner() { if ($("banner").hidden) return; $("banner").hidden = true; render(); }   // nápověda míření až po kartě
   $("banner").addEventListener("click", hideBanner);
   function notice(text) {
     const n = $("notice"); n.textContent = text; n.hidden = false; say(text);
     n.classList.remove("go"); void n.offsetWidth; n.classList.add("go");
-    clearTimeout(notice.t); notice.t = setTimeout(() => n.hidden = true, 4200);
+    $("hud").classList.add("noticing");   // nápověda míření stojí na stejném místě, na chvíli ustoupí
+    clearTimeout(notice.t); notice.t = setTimeout(() => { n.hidden = true; $("hud").classList.remove("noticing"); }, 4200);
   }
   function cast(el) {
     if (el.childElementCount) return;
@@ -1465,6 +1518,7 @@
 
   // ---------- hraní: odveta, vzdání ----------
   async function rematch() {
+    if (solo) { startSolo({ map: st.map, md: st.md }); return; }
     if (busy || !me || !ended()) return;
     const starts = st.old ? st.s : st.win === "=" ? other(st.s) : other(st.win);
     const next = freshGame(st.x, st.o, starts, st.k, st.kc, seriesAfter(), { map: st.map, md: st.md });
@@ -1482,6 +1536,7 @@
   }
   $("endPrimary").addEventListener("click", rematch);
   $("endSecondary").addEventListener("click", () => {
+    if (solo) { newGame(); return; }
     if (me && st.win && st.win !== "=" && st.win !== me && !st.old) copy(concedeText(), "Zkopírováno, vlož to do chatu");
     else copyLink();
   });
@@ -1531,13 +1586,20 @@
   const openSheet = id => { const d = $(id); if (!d.open) d.showModal(); };
   document.querySelectorAll("dialog [data-close]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
   document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
-  $("menuBtn").addEventListener("click", () => { $("mResign").hidden = !me || ended(); openSheet("menuSheet"); });
+  $("menuBtn").addEventListener("click", () => {
+    $("mResign").hidden = !me || ended(); $("mCopy").hidden = solo;
+    $("mNew").textContent = solo ? "Vyzvat soupeře" : "Nová hra s někým jiným";
+    openSheet("menuSheet");
+  });
   $("mCopy").addEventListener("click", () => { $("menuSheet").close(); copyLink(); });
   $("mHelp").addEventListener("click", () => { $("menuSheet").close(); openSheet("helpSheet"); });
   $("mResign").addEventListener("click", () => { $("menuSheet").close(); resign(); });
   $("mNew").addEventListener("click", () => { $("menuSheet").close(); newGame(); });
-  function syncSound() { $("soundWave").toggleAttribute("hidden", muted); $("soundOff").toggleAttribute("hidden", !muted); $("soundBtn").setAttribute("aria-label", muted ? "Zapnout zvuk" : "Vypnout zvuk"); $("soundLbl").textContent = muted ? "Zvuk vyp." : "Zvuk"; }
+  function syncSound() { $("soundWave").toggleAttribute("hidden", muted); $("soundOff").toggleAttribute("hidden", !muted); $("soundBtn").setAttribute("aria-label", muted ? "Zapnout zvuk" : "Vypnout zvuk"); $("soundLbl").textContent = muted ? "Zvuk vyp." : "Zvuk"; $("mSound").textContent = muted ? "Zapnout zvuk" : "Vypnout zvuk"; }
   $("soundBtn").addEventListener("click", () => { muted = !muted; store.set("jp-mute", muted ? "1" : "0"); syncSound(); });
+  // na telefonu jsou zvuk a celá obrazovka v nabídce (stejné akce jako tlačítka nahoře na desktopu)
+  $("mSound").addEventListener("click", () => { $("soundBtn").click(); });
+  $("mFs").addEventListener("click", () => { $("menuSheet").close(); $("fsBtn").click(); });
   syncSound();
   const iOS = /iP(hone|od)/.test(navigator.userAgent);
   const standalone = attempt(() => matchMedia("(display-mode: standalone)").matches, false) || navigator.standalone === true;
@@ -1546,9 +1608,9 @@
   function syncFs() {
     const on = !!fsEl();
     $("fsIn").toggleAttribute("hidden", on); $("fsOut").toggleAttribute("hidden", !on);
-    const l = on ? "Zmenšit" : "Celá obrazovka"; $("fsLbl").textContent = l; $("fsBtn").setAttribute("aria-label", l);
+    const l = on ? "Zmenšit" : "Celá obrazovka"; $("fsLbl").textContent = l; $("fsBtn").setAttribute("aria-label", l); $("mFs").textContent = l;
   }
-  $("fsBtn").hidden = standalone;
+  $("fsBtn").hidden = standalone; $("mFs").hidden = standalone;
   $("fsBtn").addEventListener("click", () => {
     if (!fsOK) { openSheet("a2hsSheet"); return; }
     if (fsEl()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
@@ -1585,7 +1647,7 @@
     setView("share");
   }
   function newGame() {
-    clearTimeout(pollT); bootSeq++;
+    clearTimeout(pollT); bootSeq++; solo = false; clearTimeout(botNext.t);
     room = null; me = null; st = null; busy = false; net = ""; acting = null; replay = null; pickSel = null; aim = null; mode = "shoot"; ghost = null; CS.clear(); parts = []; puff = [];
     history.pushState(null, "", location.pathname + location.search);
     showSetup();
@@ -1622,6 +1684,71 @@
     createRoom(freshGame(x, o, starter, k, kc, [0, 0], null));
   });
 
+  // ---------- trénink proti botovi (#solo) ----------
+  // Jen lokálně: žádná místnost, odkaz ani zápis do mantledb, série a tituly se nepočítají. Bot hraje za Sovičky (o):
+  // míří hledáním v mřížce jako JPT.best, ale s chybou úhlu a síly; občas staví; ježka hráči vybírá náhodně; táhne s pauzou.
+  const BOT = "o", BOTNAME = "Sova Bára";
+  function startSolo(prev) {
+    clearTimeout(pollT); clearTimeout(botNext.t); bootSeq++;
+    room = null; busy = false; net = ""; acting = null; replay = null; pickSel = null; aim = null;
+    solo = true; me = "x";
+    const nm = ($("nameX").value.trim() || store.get("jp-name") || "Ty").slice(0, 16);
+    setGame(freshGame(nm, BOTNAME, "x", "", "", [0, 0], prev));
+    if (location.hash !== "#solo") history.replaceState(null, "", location.pathname + location.search + "#solo");
+    resetScene(); bannerFor = "";
+    setView("play"); afterChange(true);
+  }
+  $("soloBtn").addEventListener("click", () => startSolo(null));
+  const rnd2 = (a, b) => a + Math.random() * (b - a);
+  function botNext() {
+    clearTimeout(botNext.t);
+    if (!solo || !st || ended() || st.p !== BOT || acting || replay) return;
+    const seq = bootSeq, id = st.id, n = st.n, ph = st.ph;
+    botNext.t = setTimeout(() => { if (solo && seq === bootSeq && st && st.id === id && st.n === n && st.ph === ph && st.p === BOT && !acting && !replay) botMove(seq); }, (ph === "pick" ? 900 : 1300) / speed());
+  }
+  async function botMove(seq) {
+    const base = st, opp = other(BOT);
+    if (base.ph === "pick") {
+      const p = base.pl[opp], hg = p[Math.floor(Math.random() * p.length)];
+      const next = { ...base, ph: "t", p: opp, hd: { ...base.hd, [opp]: hg }, pl: giveHog(base, opp, hg) };
+      sfx.pick(); setGame(next); afterChange(false);
+      say(`${nameOf(next, BOT)} ti posílá: ${HOGUI[hg][0]}.`);
+      return;
+    }
+    // občas stavba (když smí): díl co nejblíž ke králi, stejně jako výchozí místo u hráče
+    if (!buildBlock(base, BOT) && Math.random() < 0.28) {
+      const kind = ["mS", "sB", "wP"][Math.floor(Math.random() * 3)], keep = me;
+      let g; me = BOT; try { g = defaultGhost(kind, 0); if (!g.ok && kind === "wP") g = defaultGhost(kind, 1); } finally { me = keep; }
+      if (g && g.ok) {
+        const sim = JP.sim(base.b, { env: env() }); sim.place(BOT, g.kind, g.x, g.y, g.rot); while (sim.step());
+        const res = sim.result();
+        const act = { n: base.n + 1, by: BOT, kind: "b", kf: res.kf, ev: res.ev, b0: JP.packBodies(base.b), pc: { k: g.kind, x: Math.round(g.x * 10) / 10, y: Math.round(g.y * 10) / 10, r: g.rot } };
+        startReplay([act], advance(base, res.bodies, BOT, act));
+        return;
+      }
+    }
+    // výstřel: mřížka úhlů a sil (po kouscích, ať nezamrzne obraz), pak lidská chyba
+    const type = handOf(base, BOT), E = env(), kH = (bs, t) => { const k = JP.kingOf(bs, t); return k ? k.hp : -100; };
+    const cands = [];
+    for (let deg = 14; deg <= 70; deg += 7) {
+      for (let p = 0.62; p <= 1.0001; p += 0.095) {
+        const ang = -Math.PI + deg * Math.PI / 180, s = JP.sim(base.b, { env: E }); s.launch(BOT, ang, p, type); while (s.step());
+        const r = s.result(), ko = JP.alive(base.b, opp) - JP.alive(r.bodies, opp);
+        cands.push({ deg, p, score: (kH(base.b, opp) - kH(r.bodies, opp)) * 3 - (kH(base.b, BOT) - kH(r.bodies, BOT)) * 4 + ko * 20 - (JP.alive(base.b, BOT) - JP.alive(r.bodies, BOT)) * 25 + (base.b.length - r.bodies.length) * 0.5 });
+      }
+      await new Promise(r => setTimeout(r, 0));
+      if (!solo || seq !== bootSeq || st !== base) return;
+    }
+    cands.sort((a, b) => b.score - a.score);
+    const pick = cands[Math.random() < 0.6 ? 0 : Math.floor(Math.random() * Math.min(6, cands.length))];
+    const deg = pick.deg + rnd2(-6, 6), pow = clamp(pick.p * (1 + rnd2(-0.08, 0.06)), 0.4, 1);
+    const ang = -Math.PI + deg * Math.PI / 180;
+    const sim = JP.sim(base.b, { env: E }); sim.launch(BOT, ang, pow, type); while (sim.step());
+    const res = sim.result(24000);
+    const act = { n: base.n + 1, by: BOT, kind: "s", kf: res.kf, ev: res.ev, b0: JP.packBodies(base.b), a: Math.round(ang * 1000), f: Math.round(pow * 1000), ht: type };
+    startReplay([act], advance(base, res.bodies, BOT, act));
+  }
+
   // ---------- start ----------
   function info(title, meta, retry) {
     $("infoTitle").textContent = title;
@@ -1649,11 +1776,12 @@
   }
   function boot() {
     const seq = ++bootSeq;
-    clearTimeout(pollT);
+    clearTimeout(pollT); solo = false; clearTimeout(botNext.t);
     room = null; me = null; busy = false; net = ""; fails = 0; acting = null; replay = null; pickSel = null; aim = null; mode = "shoot"; ghost = null;
     const h = (location.hash || "").replace(/^#/, "");
     const r = /^r\.([0-9a-z]{6,24})$/.exec(h);
     if (r) { openRoom(r[1], seq); return; }
+    if (h === "solo") { startSolo(null); return; }
     st = null; showSetup();
   }
 
@@ -1665,7 +1793,7 @@
       hogScreen: () => { const h = currentHog(); return h ? toScreen(h.x, h.y) : null; },
       topY: () => Math.min(...st.b.map(b => [toScreen(b.x, JP.aabb(b)[1])]).filter(([p]) => p[0] > 0 && p[0] < cw).map(([p]) => p[1])),
       proj: (x, y) => { const [sx, sy] = toScreen(x, y); const r = cv.getBoundingClientRect(); return [r.left + sx, r.top + sy]; },
-      stats: STATS, calm,
+      stats: STATS, calm, solo: () => solo,
       crit: () => [...CS.values()].filter(s => frameN - s.last <= 3).map(s => ({ t: s.t, k: s.k, fear: +s.fear.toFixed(2), hit: +s.hit.toFixed(2), cheer: +s.cheer.toFixed(2), sad: +s.sad.toFixed(2), startle: +s.startle.toFixed(2) })),
       sling: () => { const [x, y] = toScreen(SLING[me].x, SLING[me].y); const r = cv.getBoundingClientRect(); return [r.left + x, r.top + y]; },
       ghost: () => ghost && { ...ghost, screen: JPT.proj(ghost.x, ghost.y) },

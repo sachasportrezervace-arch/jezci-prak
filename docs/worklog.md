@@ -2,6 +2,20 @@
 
 PŘEVZATO 31. 10. – dodělává session na účtu P, jiná session sem nepíše.
 
+## 2026-10-31 · Claude (převzetí v2: předávka k nasazení)
+- Hotovo: HUD v2, opravy po design-eye (3 kola, kolo 3 verdikt „profesionální indie hra: ANO“), sólo režim „Zkusit sám“ / `#solo` (`tests/solo.cjs`), nový `tests/duel.cjs` v2 a `tests/playtest.cjs` (3 partie přes odvetu).
+- Vyvážení (engine.js): král 70 HP; zásahy krále mají strop 30 **za celou akci** (`kingCap 0.43`, dřív za každý náraz → král padal 1.–2. ranou); dotek země krále nevyřadí, vezme 35 (`KING_FALL`, jednou za akci, král ležící na zemi už znovu neztrácí); limit 8 tahů každého (`RULES.turns 8`). Texty v #intro, #helpSheet a na konci upravené.
+- Playtest (`node tests/playtest.cjs http://127.0.0.1:8823/`, exit 0, lidské časy, bot = nejlepší rána ±4°/±6 %):
+  | # | mapa | modifikátor | tahů | výstřelů | staveb | minut | vítěz | jak |
+  |---|---|---|---|---|---|---|---|---|
+  | 1 | Plošiny | lehká gravitace | 16 | 12 | 4 | 4,9 | Mark | po 8. tahu |
+  | 2 | Údolí s jezírkem | vítr →3 | 16 | 14 | 2 | 4,2 | Mark | král padl |
+  | 3 | Skála | lehká gravitace | 15 | 12 | 3 | 4,0 | Radka | král padl |
+  Comeback ve všech 3 partiích, bez chyb stránky. Předtím (král 80, 9 tahů) 5,4–9,0 min a všechny limitem, takže 8 tahů a 70 HP je kompromis. Bot je přesnější než člověk, reálné partie budou spíš delší.
+- Testy: `tune.cjs` exit 0 (determinismus 390/390, král jednou ranou 0 %), `gen.cjs` exit 0, `solo.cjs` 25 PASS 0 FAIL exit 0, `duel.cjs` 131 PASS **2 FAIL** (exit 1): (a) kontrola nápovědy čekala „devátém tahu“, opraveno v testu na „osmém“, znovu neověřeno; (b) „prefers-reduced-motion: kamera … pár pevných záběrů“ u přihlížejícího naměřila 1 plató místo 2–4 (`tests/duel.cjs` ~ř. 714–726), kolem toho kamera v reduced-motion po opravách design-eye (jeden pevný záběr letu). Rozhodnout: upravit test podle nového chování, nebo kameru.
+- Port: 8803 drží cizí server Ovocného souboje, Ježkomet lokálně na 8823 (PID v `%TEMP%\jezci-8823.pid`, zastavit jen ten).
+- Dál: oprav (b), `node tests/duel.cjs http://127.0.0.1:8823/` 0 FAIL, README + DESIGN.md (jednotky, ježek špičák, mapy, modifikátory, comeback, tituly, sólo, nová čísla krále), bump `?v=` v index.html, commit, push (`git -c credential.helper= -c "credential.helper=!gh auth git-credential" push`), počkat na Pages, živý test `node tests/duel.cjs https://sachasportrezervace-arch.github.io/jezci-prak/` a `#solo`, zprávu nadřazené session.
+
 ## 2026-10-31 · Claude (převzetí v2, rozpracováno)
 - Stav: engine, fort.js, game.js, art.js v2 hotové z přerušené session (WIP commit 779bb1a). Doplněno: HUD v2 v `index.html` (lišty krále, pastilky jednotek, Střelba/Stavba, díly, výběr z 5 ježků, karta partie s mapou a modifikátorem, oznámení comebacku, titul na konci), `fort.js` v index, `?v=20`, nápověda a intro v2. Nový `tests/playtest.cjs` (GAMES partií přes odvetu, tabulka).
 - Ověřeno: `node tests/gen.cjs` exit 0 (200 seedů, 100 % do 3 pokusů), `node tests/tune.cjs` exit 0 (determinismus 390/390, kf ≤ 24 kB), kouřový playtest 1 partie exit 0 bez chyb stránky. Sim `playtest-sim.cjs` 30 partií: medián 15 tahů, konec králem 67 %, remíza 3 %.

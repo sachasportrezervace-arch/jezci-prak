@@ -26,7 +26,8 @@
 //   cam.button(team) -> {label, plus}   stav tlačítka přehledu;  cam.toggle(team, mySlingX) = jeho kliknutí:
 //                                         ruční → zpět na automatiku, automatika → celá scéna (na výšku) nebo přiblížení (jinak)
 // Pohyb: kritické tlumení (SmoothDamp) nezávislé na snímkové frekvenci, žádné skoky mezi cíli. Za letu střed sleduje ježka
-// s předstihem ve směru letu, měřítko se zmenšuje s rychlostí a výškou, při velkém výšce se posune i svisle; po dopadu
+// s předstihem ve směru letu, měřítko se zmenšuje s rychlostí a výškou, při velkém výšce se posune i svisle; na výšku
+// záběr drží ježka, zem pod ním a od půlky letu i cílovou pevnost (oddálí se jen tolik, kolik je třeba); po dopadu
 // krátce zůstane a pomalu se vrátí na výchozí pohled.
 (function (root) {
   "use strict";
@@ -47,7 +48,7 @@
     const LEAD = 0.22, HUGE = 1200;           // předstih (s) a rychlost ježka při plné síle (svět/s), z ní se odvozuje zoom
     let cw = 1, ch = 1;
     const c = { x: W / 2, y: 0, s: 0.5, vx: 0, vy: 0, vs: 0 };
-    let manual = null, pinch = null, needSnap = true, kick = 0, holdT = 0, holdX = W / 2, holdS = 0.5, hadHog = false;
+    let manual = null, pinch = null, needSnap = true, kick = 0, holdT = 0, holdX = W / 2, holdS = 0.5, hadHog = false, redTop = 0;
 
     // ----- rozvržení -----
     c.portrait = () => ch > cw * 1.1;
@@ -73,7 +74,7 @@
     c.toWorld = (sx, sy) => [c.x + (sx - cw / 2) / c.s, GY + 70 - c.y + (sy - anchorAt(c.s)) / c.s];
     // pohled na pevnost a prak týmu (na výšku): prak u okraje, pevnost celá vedle něj, soupeř mimo záběr
     function homeFor(team) {
-      const s = c.homeS(), span = cw / s, sx = SLING[team].x, f = H.left == null ? 0.84 : clamp((sx - H.left) / span, 0.5, 0.96);
+      const s = c.homeS(), span = cw / s, sx = SLING[team].x, f = H.left == null ? 0.84 : clamp(((team === "x" ? sx : W - sx) - H.left) / span, 0.5, 0.96);   // tým o zrcadlově (jinak jeho prak sedí 16 px od okraje)
       return clampView(team === "x" ? sx - (f - 0.5) * span : sx + (f - 0.5) * span, s);
     }
     c.restView = team => c.portrait() ? homeFor(team) : { x: W / 2, s: c.overview() };
@@ -133,26 +134,53 @@
         return { x: b.x, s: b.s, y: 0, T: slow };
       }
       const u = clamp((h.x - sx) / (tx - sx), 0, 1);
-      if (reduced) return { ...(port && u >= 0.55 ? b : a), y: 0, T: { x: 0.18, y: 0.18, s: 0.18 } };
+      if (reduced && port) {
+        // na výšku bez animací: za letu jeden pevný záběr od praku po cílovou pevnost (žádné sledování); vyletí-li ježek
+        // nad horní okraj, záběr se skokově oddálí o celé patro (krok 160), takže ježek je vidět pořád
+        if (!S.waiting) redTop = Math.min(redTop || GY - 330, Math.floor((h.y - 80) / 160) * 160);
+        const minX = Math.min(sx, ZONE[tg][0]) - 60, maxX = Math.max(sx, ZONE[tg][1]) + 30;
+        const minY = redTop || GY - 330, maxY = GY + 30, top = cfg.flightTop || 150, bot = 34;
+        const s = clamp(Math.min((cw - 24) / (maxX - minX), (ch - top - bot) / (maxY - minY)), minS(), c.homeS());
+        const y = clamp((ch - bot - anchorAt(s)) / s - (maxY - GY - 70), 0, 1400);
+        holdX = (minX + maxX) / 2; holdS = s; holdT = 0;
+        return { x: holdX, s, y, T: { x: 0.18, y: 0.18, s: 0.18 } };
+      }
+      if (reduced) return { ...a, y: 0, T: { x: 0.18, y: 0.18, s: 0.18 } };
       const base = port ? c.homeS() : flightBase();
       // před odpalem se kamera srovná na ježka v praku (prak je u okraje záběru, ježek by jinak hned vyletěl z obrazovky)
       if (S.waiting) { const dir = tg === "o" ? 1 : -1, x = port ? clamp(sx + dir * 40, Math.min(a.x, b.x), Math.max(a.x, b.x)) : sx; return { x, s: base, y: 0, T: { x: 0.28, y: 0.3, s: 0.35 } }; }
-      // let: střed před ježkem ve směru letu, zoom podle rychlosti a výšky, svislý posun, když ježek vyletí nad horní okraj
       const sp = Math.hypot(h.vx, h.vy), speedN = clamp(sp / HUGE, 0, 1), heightN = clamp((GY - h.y) / 450, 0, 1);
-      const s = Math.max(c.overview(), base * (1 - (port ? 0.16 : 0.22) * clamp(0.55 * speedN + 0.45 * heightN, 0, 1)));
       const xl = h.x + h.vx * LEAD, yl = h.y + h.vy * LEAD;
-      const x = port ? clamp(xl, Math.min(a.x, b.x), Math.max(a.x, b.x)) : xl;
-      const ay = anchorAt(s), margin = port ? 175 : 130;
+      if (port) {
+        // na výšku: záběr drží ježka (i s předstihem), zem pod ním a od půlky letu i cílovou pevnost, ať je vidět dopad;
+        // oddálí se jen tolik, kolik je potřeba, a zem zůstává dole (nikdy ježek v prázdném nebi)
+        const w = clamp((u - 0.2) / 0.45, 0, 1), k = w * w * (3 - 2 * w);
+        const fL = ZONE[tg][0] - 30, fR = ZONE[tg][1] + 30, fTop = GY - 330;
+        const minX = Math.min(h.x - 60, xl - 70, xl + (fL - xl) * k), maxX = Math.max(h.x + 60, xl + 70, xl + (fR - xl) * k);
+        const minY = Math.min(h.y - 70, yl - 70, GY - 150 + (fTop - GY + 150) * k), maxY = GY + 30;
+        const top = cfg.flightTop || 150, bot = 34;
+        const fit = Math.min((cw - 24) / (maxX - minX), (ch - top - bot) / (maxY - minY));
+        const s = clamp(Math.min(fit, base * (1 - 0.12 * speedN)), minS(), base);
+        const x = (minX + maxX) / 2;
+        const y = clamp((ch - bot - anchorAt(s)) / s - (maxY - GY - 70), 0, 1400);
+        hadHog = true; holdX = x; holdS = s;
+        holdT = u < 0.9 ? 0.6 : 0;
+        return { x, s, y, T: { x: 0.2, y: 0.22, s: 0.3 } };
+      }
+      // let: střed před ježkem ve směru letu, zoom podle rychlosti a výšky, svislý posun, když ježek vyletí nad horní okraj
+      const s = Math.max(c.overview(), base * (1 - 0.22 * clamp(0.55 * speedN + 0.45 * heightN, 0, 1)));
+      const x = xl;
+      const ay = anchorAt(s), margin = 130;
       const y = clamp((margin - ay) / s - (yl - GY - 70), 0, 600);
-      hadHog = true; holdX = x; holdS = port ? c.homeS() * 0.92 : base;
-      holdT = port ? (u < 0.9 ? 0.6 : 0) : 1.25;
+      hadHog = true; holdX = x; holdS = base;
+      holdT = 1.25;
       return { x, s, y, T: { x: 0.18, y: 0.2, s: 0.32 } };
     }
 
     c.update = (dt, intent) => {
       dt = clamp(dt, 0.001, 0.1);
       const rest = intent.rest, reduced = !!intent.reduced, S = intent.shot;
-      if (!S) { holdT = 0; hadHog = false; }
+      if (!S) { holdT = 0; hadHog = false; redTop = 0; }
       else if (!S.hog && holdT > 0) holdT -= dt;
       kick *= Math.exp(-dt / 0.28);
       let g;
