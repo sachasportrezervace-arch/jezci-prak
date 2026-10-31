@@ -162,7 +162,7 @@
   const overview = () => Math.min(cw / 1440, (ch - 80) / 640);     // celá scéna
   const minS = () => overview() * 0.9, maxS = () => Math.max(overview() * 3.2, 1.2);
   // y světa GY+70 leží na této výšce obrazovky
-  const anchorY = () => portrait() ? Math.min(ch - 70, ch * 0.5 + cam.s * 520) : ch;
+  const anchorY = () => portrait() ? Math.min(ch - 40, ch * 0.5 + cam.s * 330) : ch;
   function clampCam(x, s) {
     s = clamp(s, minS(), maxS());
     const half = cw / (2 * s);
@@ -173,16 +173,13 @@
   // výchozí pohled: na desktopu a na šířku celá scéna, na výšku přiblížená vlastní strana
   function autoView() {
     const ov = overview();
-    if (portrait() && me && !ended()) {
-      const s = Math.max(ov, Math.min(cw / 760, 1)), half = cw / (2 * s);
-      return { x: me === "x" ? SLING.x.x - 90 + half : SLING.o.x + 90 - half, s };
-    }
+    if (portrait()) return { x: W / 2, s: Math.max(ov, cw / 1280) };   // obě pevnosti přes celou šířku
     return { x: W / 2, s: ov };
   }
-  const fullNow = () => cam.user ? Math.abs(cam.user.s - overview()) < 0.01 : autoView().s <= overview() + 0.001;
+  const fullNow = () => !(cam.user && cam.user.s > autoView().s * 1.05);   // není přiblíženo víc než výchozí záběr
   function syncView() {
     const full = fullNow();
-    $("viewMinus").toggleAttribute("hidden", full); $("viewPlus").toggleAttribute("hidden", !full);
+    $("viewPlus").toggleAttribute("hidden", !full);
     const l = full ? "Přiblížit" : "Celá scéna"; $("viewLbl").textContent = l; $("viewBtn").setAttribute("aria-label", l);
   }
   const toScreen = (x, y) => [cw / 2 + (x - cam.x) * cam.s, anchorY() + (y - GY - 70) * cam.s];
@@ -209,20 +206,26 @@
     sky.addColorStop(0, "#5CC8EE"); sky.addColorStop(0.6, "#A9E6F4"); sky.addColorStop(1, "#FFF1C4");
     ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
     // slunce
-    const sunX = cw * 0.16 - cam.x * s * 0.03, sunY = Math.max(70, gyS - 560 * s);
-    ctx.fillStyle = "rgba(255,226,122,.35)"; circle(ctx, sunX, sunY, 70 * Math.max(s, 0.45)); ctx.fill();
-    ctx.fillStyle = "#FFE27A"; circle(ctx, sunX, sunY, 44 * Math.max(s, 0.45)); ctx.fill(); outline(ctx, 3);
+    const sr = 40 * clamp(s, 0.45, 1), sunX = cw * 0.28 - cam.x * s * 0.03, sunY = Math.max(150 + sr, gyS - 600 * s);
+    ctx.fillStyle = "#FFF3C2"; circle(ctx, sunX, sunY, sr * 1.55); ctx.fill();
+    ctx.fillStyle = "#FFE27A"; circle(ctx, sunX, sunY, sr); ctx.fill(); outline(ctx, 3);
+    ctx.fillStyle = "#FFF7D6"; circle(ctx, sunX - sr * 0.35, sunY - sr * 0.35, sr * 0.22); ctx.fill();
     // mraky
     if (!calm()) drift += 0.12;
     for (const c of clouds) {
       const span = (W + 900);
       const wx = ((c.x + drift * c.k) % span + span) % span - 450;
       const sx = cw / 2 + (wx - cam.x * 0.25 - W * 0.375) * s * 0.9, sy = gyS - (520 + c.y) * s;
-      const r = 34 * s * c.k + 10;
-      ctx.beginPath();
-      ctx.arc(sx, sy, r, Math.PI * 0.5, Math.PI * 1.5); ctx.arc(sx + r * 0.9, sy - r * 0.55, r * 0.9, Math.PI, Math.PI * 1.85);
-      ctx.arc(sx + r * 1.9, sy - r * 0.2, r * 0.8, Math.PI * 1.3, Math.PI * 0.1); ctx.arc(sx + r * 2.1, sy + r * 0.3, r * 0.7, Math.PI * 1.7, Math.PI * 0.5);
-      ctx.closePath(); ctx.fillStyle = "#fff"; ctx.fill(); outline(ctx, 2.5);
+      const r = 34 * s * c.k + 10, lw = 2.5;
+      const blobs = [[0, 0, 1], [r * 0.95, -r * 0.5, 0.95], [r * 1.9, -r * 0.15, 0.85], [r * 2.6, r * 0.25, 0.62], [r * 1.2, r * 0.32, 0.75]];
+      const flat = sy + r * 0.62;
+      ctx.save(); ctx.beginPath(); ctx.rect(sx - r * 2, sy - r * 3, r * 7, flat - (sy - r * 3) + lw); ctx.clip();
+      ctx.fillStyle = INK;
+      for (const [dx, dy, k] of blobs) { circle(ctx, sx + dx, sy + dy, r * k + lw); ctx.fill(); }
+      ctx.fillStyle = "#fff";
+      for (const [dx, dy, k] of blobs) { circle(ctx, sx + dx, sy + dy, r * k); ctx.fill(); }
+      ctx.restore();
+      ctx.beginPath(); ctx.moveTo(sx - r * 0.86, flat); ctx.lineTo(sx + r * 2.98, flat); ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.stroke();
     }
     // vzdálené kopce (0.35) a keře (0.65)
     layer(0.35, "#8FD3C0", "#79C3AF", X => 130 + 45 * Math.sin(X / 190) + 30 * Math.sin(X / 83 + 1.3), 40);
@@ -278,7 +281,7 @@
       ctx.translate(g.x, g.y); if (g.rot) ctx.rotate(Math.PI / 2); drawBlock(ctx, g.k, lw, 0, 3); ctx.restore();
       ctx.save(); ctx.setLineDash([10, 8]); ctx.strokeStyle = "rgba(43,22,56,.5)"; ctx.lineWidth = lw * 0.7;
       ctx.beginPath(); ctx.moveTo(g.x, g.y + 30); ctx.lineTo(g.x, GY - 34); ctx.stroke(); ctx.restore();
-      const [z0, z1] = ZONE[me]; ctx.fillStyle = "rgba(198,244,50,.22)"; ctx.fillRect(z0, 80, z1 - z0, GY - 110);
+      const [z0, z1] = ZONE[me]; rrect(ctx, z0, GY - 6, z1 - z0, 10, 5); ctx.fillStyle = "#C6F432"; ctx.fill(); outline(ctx, lw * 0.6);
     }
     // náhled dráhy
     if (scene.dots) {
@@ -809,7 +812,7 @@
     const alive = t => sc.bodies.filter(b => b.k === "C" && b.t === t).length;
     $("nmX").textContent = st.x; $("nmO").textContent = st.o;
     lives($("livesX"), "x", alive("x")); lives($("livesO"), "o", alive("o"));
-    const w = st.w;
+    const w = ended() && !replay && !acting ? seriesAfter() : st.w;
     $("score").innerHTML = `<b class="x">${w[0]}</b> : <b class="o">${w[1]}</b>`;
     $("score").setAttribute("aria-label", `Série ${st.x} ${w[0]}, ${st.o} ${w[1]}`);
     const turnP = ended() ? null : st.p;
@@ -857,16 +860,13 @@
         b.addEventListener("click", () => { if (ghost) { ghost.k = k; store.set("jp-kind", k); renderKinds(); } });
         box.appendChild(b);
       }
-      const r = document.createElement("button"); r.type = "button"; r.className = "btn paper kind rot"; r.id = "rotBtn";
-      r.innerHTML = `<svg class="i" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>Otočit`;
-      r.addEventListener("click", rotate);
-      box.appendChild(r);
     }
     for (const b of box.querySelectorAll("[data-k]")) b.setAttribute("aria-pressed", String(!!ghost && ghost.k === b.dataset.k));
     $("rotBtn").setAttribute("aria-pressed", String(!!ghost && ghost.rot));
     $("dropBtn").disabled = busy;
   }
   $("dropBtn").addEventListener("click", dropBlock);
+  $("rotBtn").addEventListener("click", rotate);
 
   function renderEnd() {
     const won = me && st.win === me, s = stake(st), W_ = nameOf(st, st.win), L = nameOf(st, other(st.win));

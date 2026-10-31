@@ -60,7 +60,8 @@ const other = p => p === "x" ? "o" : "x";
   // 3) rozvržení a kamera
   const ca = await camOf(A), cb = await camOf(B);
   check("desktop: výchozí pohled = celá scéna", Math.abs(ca.s - ca.full) < 0.01, `s ${ca.s.toFixed(3)} / celá ${ca.full.toFixed(3)}`);
-  check("iPhone na výšku: výchozí pohled přiblížený (scéna širší než displej)", cb.s > cb.full * 1.3, `s ${cb.s.toFixed(3)} / celá ${cb.full.toFixed(3)}`);
+  const fortsIn = await B.evaluate(() => { const c = window.JPT.cam(); return [70, 1330].map(x => innerWidth / 2 + (x - c.x) * c.s); });
+  check("iPhone na výšku: v záběru obě pevnosti přes celou šířku", fortsIn[0] >= -2 && fortsIn[1] <= 392 && fortsIn[1] - fortsIn[0] > 340, fortsIn.map(v => v.toFixed(0)).join(" až "));
   const lblVis = await A.locator("#viewLbl").isVisible(), lblB = await B.locator("#viewLbl").isVisible();
   const toolsA = await A.locator(".tools").boundingBox(), toolsB = await B.locator(".tools").boundingBox();
   check("desktop: nástroje s popisky v řadě dole, mobil: ikony ve sloupci nahoře", lblVis && !lblB && toolsA.width > toolsA.height && toolsA.y > 700 && toolsB.height > toolsB.width && toolsB.y < 120);
@@ -72,11 +73,13 @@ const other = p => p === "x" ? "o" : "x";
 
   // posun tažením mimo prak (iPhone)
   const vb = B.viewportSize();
+  await B.click("#viewBtn");   // přiblížit, ať je kam posouvat
+  const cbz = await camOf(B);
   await B.mouse.move(vb.width * 0.5, vb.height * 0.3); await B.mouse.down();
-  for (let i = 1; i <= 5; i++) await B.mouse.move(vb.width * 0.5 - i * 30, vb.height * 0.3);
+  for (let i = 1; i <= 5; i++) await B.mouse.move(vb.width * 0.5 + i * 30, vb.height * 0.3);
   await B.mouse.up();
   const cb2 = await camOf(B);
-  check("iPhone: posun tažením mimo prak", cb2.user && cb2.x > cb.x + 100, `x ${cb.x.toFixed(0)} → ${cb2.x.toFixed(0)}`);
+  check("iPhone: posun tažením mimo prak", cb2.user && cb2.x < cbz.x - 100, `x ${cbz.x.toFixed(0)} → ${cb2.x.toFixed(0)}`);
   // pinch dvěma prsty (syntetické pointer události)
   await B.evaluate(({ w, h }) => {
     const c = document.getElementById("stage");

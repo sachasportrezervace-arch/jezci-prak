@@ -2,3 +2,5 @@ node_modules/
 tests/shots/
 .claude/
 tests/shots-live/
+tests/shots-r3/
+tests/*-sheet.png
