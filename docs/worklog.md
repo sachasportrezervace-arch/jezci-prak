@@ -1,5 +1,7 @@
 # Deník – Ježkomet (jezci-prak)
 
+PŘEVZATO 31. 10. – dodělává session na účtu P, jiná session sem nepíše.
+
 ## 2026-10-31 · Claude (kolo 5: kamera na všech zařízeních)
 - Zadání se změnilo (koordinátor: velký upgrade hry, král, víc jednotek, náhodné pevnosti): ladění délky partie se v tomto kole nenasazuje a nic se nepushuje. Zůstala jen kamera.
 - Hotovo: kamera je v samostatném `camera.js` (rozhraní v hlavičce): `create`, `resize`, `update(dt, intent)`, `toScreen / toWorld`, `restView`, `panTo`, `pinchStart / Move / End`, `zoomAt`, `toggle / button / release`, `impact`, `snapNext`. `game.js` jen skládá `intent` (výchozí pohled, výstřel s ježkem a jeho rychlostí) a kreslí. Pohyb je kritické tlumení (SmoothDamp) nezávislé na fps, bez skoků mezi cíli.

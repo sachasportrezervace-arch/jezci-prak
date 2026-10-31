@@ -1,6 +1,8 @@
 // Ježkomet – kamera (bez DOM, bez znalosti pravidel hry). Používá game.js, jde ji spustit i v Node (testy).
 //
-// const cam = JPCam.create({ W, GY, SLING, ZONE, CR });   // rozměry světa z engine.js
+// const cam = JPCam.create({ W, GY, SLING, ZONE, CR, home });   // rozměry světa z engine.js
+//   home (volitelné, výchozí = v1): { span, left, top, tall, dirt: [podíl, min, max] } výchozí záběr na výšku:
+//   span = šířka světa v záběru, left = levý okraj pevnosti týmu x, top = místo nad pevností pro HUD (px), tall = výška pevnosti nad zemí
 //
 // Rozvržení a mapování
 //   cam.resize(cw, ch)                  velikost plátna v CSS px; kamera naskočí na cíl bez přechodu
@@ -10,7 +12,7 @@
 //   cam.restView(team) -> {x, s}        výchozí pohled pro tým na tahu (na výšku pevnost a prak, jinak celá scéna)
 // Snímek
 //   cam.update(dt, intent)              dt v sekundách; intent = {
-//                                         rest: {x, s},                       výchozí pohled (z restView)
+//                                         rest: {x, s, y?},                   výchozí pohled (z restView); y = svislý posun (stavba nad panelem)
 //                                         reduced: bool,                      prefers-reduced-motion: jen krátké přechody
 //                                         shot: null | { team, waiting, hog } probíhající výstřel; hog = null | {x, y, vx, vy}
 //                                       }                                      (vx, vy ve světě za sekundu)
@@ -40,6 +42,7 @@
 
   function create(cfg) {
     const { W, GY, SLING, ZONE } = cfg;
+    const H = { span: 400, left: null, top: 285, tall: 312, dirt: [0.115, 72, 104], ...(cfg.home || {}) };
     const other = t => t === "x" ? "o" : "x";
     const LEAD = 0.22, HUGE = 1200;           // předstih (s) a rychlost ježka při plné síle (svět/s), z ní se odvozuje zoom
     let cw = 1, ch = 1;
@@ -49,9 +52,9 @@
     // ----- rozvržení -----
     c.portrait = () => ch > cw * 1.1;
     c.overview = () => Math.min(cw / 1440, (ch - 80) / 640);
-    const groundHome = () => ch - clamp(ch * 0.115, 72, 104);   // na výšku: zem u spodku, pod ní pruh hlíny pro nápovědu a měřič
+    const groundHome = () => ch - clamp(ch * H.dirt[0], H.dirt[1], H.dirt[2]);   // na výšku: zem u spodku, pod ní pruh hlíny pro nápovědu a měřič
     // postavička ≥ ~36 px na iPhonu 13; shora zůstane místo pro HUD a panely nad pevností
-    c.homeS = () => clamp(Math.min(cw / 400, (groundHome() - 285) / 312), c.overview(), 2.4);
+    c.homeS = () => clamp(Math.min(cw / H.span, (groundHome() - H.top) / H.tall), c.overview(), 2.4);
     const flightBase = () => Math.max(c.overview(), Math.min(cw / 900, (ch - 60) / 560));
     const minS = () => c.overview() * 0.9;
     const maxS = () => Math.max(c.overview() * 3.2, 1.2, c.portrait() ? c.homeS() * 1.8 : 0);
@@ -70,7 +73,7 @@
     c.toWorld = (sx, sy) => [c.x + (sx - cw / 2) / c.s, GY + 70 - c.y + (sy - anchorAt(c.s)) / c.s];
     // pohled na pevnost a prak týmu (na výšku): prak u okraje, pevnost celá vedle něj, soupeř mimo záběr
     function homeFor(team) {
-      const s = c.homeS(), span = cw / s, f = 0.84, sx = SLING[team].x;
+      const s = c.homeS(), span = cw / s, sx = SLING[team].x, f = H.left == null ? 0.84 : clamp((sx - H.left) / span, 0.5, 0.96);
       return clampView(team === "x" ? sx - (f - 0.5) * span : sx + (f - 0.5) * span, s);
     }
     c.restView = team => c.portrait() ? homeFor(team) : { x: W / 2, s: c.overview() };
@@ -155,7 +158,7 @@
       let g;
       if (manual) g = { x: manual.x, s: manual.s, y: 0, T: { x: 0.3, y: 0.3, s: 0.3 } };
       else if (S) g = shotGoal(S, rest, reduced);
-      else g = { x: rest.x, s: rest.s, y: 0, T: reduced ? { x: 0.18, y: 0.18, s: 0.18 } : { x: 0.45, y: 0.3, s: 0.5 } };
+      else g = { x: rest.x, s: rest.s, y: rest.y || 0, T: reduced ? { x: 0.18, y: 0.18, s: 0.18 } : { x: 0.45, y: 0.3, s: 0.5 } };
       if (!manual && !reduced && kick > 0.01) g.s *= 1 + 0.07 * kick;
       const v = clampView(g.x, g.s);
       if (needSnap) { c.x = v.x; c.s = v.s; c.y = g.y; c.vx = c.vy = c.vs = 0; needSnap = false; return; }

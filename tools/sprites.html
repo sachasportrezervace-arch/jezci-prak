@@ -1,15 +1,111 @@
-<!doctype html><meta charset="utf-8"><title>Ježkomet – přehled postaviček</title>
-<style>body{margin:0;background:#86D8F0;font:600 13px system-ui;color:#2B1638}canvas{display:block}</style>
-<canvas id="c" width="1500" height="1000"></canvas>
+<!doctype html>
+<html lang="cs">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ježkomet – přehled postaviček v2</title>
+<style>
+  body{margin:0;padding:18px 22px 40px;background:#86D8F0;font:600 13px/1.4 system-ui,sans-serif;color:#2B1638}
+  h1{font:800 22px system-ui,sans-serif;margin:0 0 4px}
+  h2{font:800 15px system-ui,sans-serif;margin:26px 0 6px;letter-spacing:.02em}
+  p{margin:0 0 6px;opacity:.78;max-width:980px}
+  canvas{display:block;border-radius:10px}
+  .flat{background:#86D8F0}
+</style>
+<h1>Ježkomet – přehled postaviček v2</h1>
+<p>Jednotky K C T S R L ve dvou týmech (Křečci x, Sovičky o), všechny výrazy, ježci, kostky a kontrola čitelnosti ve 36 a 24 px.</p>
 <script src="../vendor/matter-0.19.0.min.js"></script><script src="../engine.js"></script><script src="../art.js"></script>
 <script>
-const c=document.getElementById("c").getContext("2d"),{drawCritter,drawHog,drawBlock,TEAM}=ART;
-const S=2.6,LW=2.2;
-const states=[["klid",{}],["mrk",{blink:1}],["strach",{fear:.9,lookX:1}],["úlek",{startle:1}],["zásah",{hit:1,hurt:.35}],["plácek",{hurt:.35}],["obvaz",{hurt:.6,sad:.3}],["málem KO",{hurt:.9}],["radost",{cheer:1}],["facepalm",{sad:1}],["KO",{ko:true,hurt:1}]];
-c.fillStyle="#86D8F0";c.fillRect(0,0,1500,1000);
-c.font="600 13px system-ui";
-["x","o"].forEach((t,ri)=>states.forEach(([n,o],i)=>{c.save();c.translate(70+i*130,70+ri*125);c.scale(S,S);drawCritter(c,t,LW,{lookX:t==="x"?1:-1,t:1.3,still:false,...o});c.restore();c.fillStyle="#2B1638";c.fillText(n,40+i*130,128+ri*125)}));
-["n","k","g","b"].forEach((t,i)=>{c.save();c.translate(80+i*130,360);c.scale(S,S);drawHog(c,"x",LW,t,{t:1});c.restore()});
-const ks=[["wP"],["wL"],["wB"],["sB"],["gP"],["gS"]];
-ks.forEach(([k],i)=>[0,.3,.6,.9].forEach((d,j)=>{c.save();c.translate(130+i*230,470+j*120);const K=JP.KIND[k];const sc=Math.min(1.4,200/Math.max(K.w,K.h));c.scale(sc,sc);drawBlock(c,k,2.4/sc*1.0,d,i*4+j+2);c.restore()}));
+const { drawUnit, drawHog, drawBlock, TEAM, crown } = ART;
+const LW = 2.2, SKY = "#86D8F0", GRASS = "#6CCB3A", INK = "#2B1638";
+const NAMES = { K: "Král", C: "Strážník", T: "Tlusťoch", S: "Štítonoš", R: "Skokan", L: "Léčitel" };
+const KINDS = ["K", "C", "T", "S", "R", "L"];
+const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+function sheet(title, note, w, h) {
+  const hh = document.createElement("h2"); hh.textContent = title; document.body.appendChild(hh);
+  if (note) { const p = document.createElement("p"); p.textContent = note; document.body.appendChild(p); }
+  const cv = document.createElement("canvas"); cv.width = w * dpr; cv.height = h * dpr; cv.style.width = w + "px"; cv.style.height = h + "px"; cv.className = "flat";
+  document.body.appendChild(cv);
+  const c = cv.getContext("2d"); c.scale(dpr, dpr); c.fillStyle = SKY; c.fillRect(0, 0, w, h); c.font = "600 12px system-ui,sans-serif"; c.fillStyle = INK;
+  return c;
+}
+const label = (c, s, x, y, al = "center") => { c.textAlign = al; c.fillStyle = INK; c.fillText(s, x, y); };
+const face = t => ({ lookX: t === "x" ? 1 : -1, t: 1.3, still: false });
+const base = t => ({ ...face(t) });
+
+// 1) všechny stavy pro všechny jednotky a oba týmy
+const STATES = [["klid", {}], ["mrk", { blink: 1 }], ["strach", { fear: .9, lookX: 1 }], ["úlek", { startle: 1 }], ["zásah", { hit: 1, hurt: .35 }],
+  ["zranění .35", { hurt: .35 }], ["zranění .6", { hurt: .6, sad: .3 }], ["zranění .9", { hurt: .9 }], ["radost", { cheer: 1 }], ["smutek", { sad: 1 }], ["KO", { ko: true, hurt: 1 }]];
+{
+  const CW = 114, RH = 118, LX = 96, S1 = 1.4;
+  const c = sheet("Jednotky × stavy", "Řádky: druh a tým (x Křečci, o Sovičky). Sloupce: výrazy a zranění.", LX + CW * STATES.length + 10, RH * 12 + 28);
+  STATES.forEach(([n], i) => label(c, n, LX + i * CW + CW / 2, 16));
+  KINDS.forEach((k, ki) => ["x", "o"].forEach((t, ti) => {
+    const row = ki * 2 + ti, y0 = 22 + row * RH;
+    label(c, NAMES[k] + " (" + k + ", " + t + ")", 8, y0 + RH / 2 + 4, "left");
+    STATES.forEach(([n, o], i) => { c.save(); c.translate(LX + i * CW + CW / 2, y0 + 74); c.scale(S1, S1); drawUnit(c, k, t, LW, { ...base(t), ...o, shield: k === "S" ? 1 : undefined }); c.restore(); });
+  }));
+}
+
+// 2) speciální stavy: štít, úskok, léčení
+{
+  const CW = 124, RH = 172, S1 = 1.6;
+  const c = sheet("Štít, úskok, léčení", "Štítonoš shield 1 / .66 / .33 / 0; Skokan dodge 0 / .5 / 1; Léčitel heal .5 / 1 a strážník v ošetření.", CW * 12 + 20, RH * 2 + 36);
+  const put = (x, y, k, t, o, nm) => { c.save(); c.translate(x, y); c.scale(S1, S1); drawUnit(c, k, t, LW, { ...base(t), ...o }); c.restore(); label(c, nm, x, y + 70); };
+  ["x", "o"].forEach((t, ti) => {
+    const y = 100 + ti * RH;
+    [1, .66, .33, 0].forEach((v, i) => put(14 + CW * (i + .5), y, "S", t, { shield: v }, "štít " + v));
+    [0, .5, 1].forEach((v, i) => put(14 + CW * (4.5 + i), y, "R", t, { dodge: v }, "dodge " + v));
+    [.5, 1].forEach((v, i) => put(14 + CW * (8 + i), y, "L", t, { heal: v }, "heal " + v));
+    put(14 + CW * 10.5, y, "C", t, { heal: 1 }, "cíl léčení");
+    put(14 + CW * 11.5, y, "S", t, { shield: .33, hit: 1, hurt: .35 }, "štít .33 + zásah");
+  });
+}
+
+// 3) ježci
+{
+  const c = sheet("Ježci", "n obyčejný, k kamenný, g gumový, b bouchací, s špičák (nový). Oba týmové pásky.", 5 * 150 + 120, 300);
+  const hn = { n: "obyčejný", k: "kamenný", g: "gumový", b: "bouchací", s: "špičák" };
+  ["x", "o"].forEach((t, ti) => "nkgbs".split("").forEach((h, i) => {
+    c.save(); c.translate(120 + i * 150, 62 + ti * 140); c.scale(2.4, 2.4); drawHog(c, t, LW, h, { t: 1 }); c.restore();
+    if (ti === 0) label(c, h + " " + hn[h], 120 + i * 150, 136 + 0);
+  }));
+}
+
+// 4) kostky
+{
+  const kinds = Object.keys(JP.KIND), dm = [0, .3, .6, .9];
+  const W = 1500; let x = 14, y = 14, rowH = 0; const items = [];
+  kinds.forEach(k => {
+    const K = JP.KIND[k], sc = Math.min(1.45, 150 / Math.max(K.w, K.h)), cw = Math.max(K.w * sc + 22, 76), ch = K.h * sc + 48, gw = cw * 4 + 24;
+    if (x + gw > W) { x = 14; y += rowH + 18; rowH = 0; }
+    items.push({ k, sc, cw, x, y, ch }); rowH = Math.max(rowH, ch); x += gw;
+  });
+  const c = sheet("Kostky", "Každý druh se čtyřmi stupni poškození (0, .3, .6, .9). Dřevo w, kámen s, sklo g, led i, kov m.", W, y + rowH + 40);
+  items.forEach(({ k, sc, cw, x, y, ch }) => {
+    const K = JP.KIND[k];
+    dm.forEach((d, j) => { c.save(); c.translate(x + cw * j + cw / 2, y + 16 + ch / 2); c.scale(sc, sc); drawBlock(c, k, 2.4 / sc, d, j * 3 + 2); c.restore(); });
+    label(c, k + "  " + K.w + "×" + K.h + "  (" + K.m + ")", x, y + 10, "left");
+  });
+}
+
+// 5) čitelnost: 36 px, 24 px a skutečný poměr
+{
+  const EXT = { K: [-37, 26], C: [-26, 21], T: [-34, 32], S: [-40, 29], R: [-22, 16], L: [-31, 20] };
+  const rows = [["36 px (výška postavičky včetně koruny/hřebenu)", 36, 0], ["24 px", 24, 0], ["ve hře, přirozený poměr, měřítko 0,5", 0, .5], ["ve hře, přirozený poměr, měřítko 0,38", 0, .38]];
+  const CW = 96, RH = 78, LX = 250;
+  const c = sheet("Čitelnost siluet v malé velikosti", "Řádky 1 a 2: každá jednotka přepočtená na stejnou výšku. Řádky 3 a 4: skutečné poměry velikostí na obrazovce.", LX + CW * 12 + 10, RH * rows.length + 30);
+  c.fillStyle = "#6CCB3A"; c.fillRect(0, 22 + RH * 4 - 10, 0, 0);
+  const order = []; KINDS.forEach(k => ["x", "o"].forEach(t => order.push([k, t])));
+  order.forEach(([k, t], i) => label(c, k + (t === "x" ? "x" : "o"), LX + i * CW + CW / 2, 16));
+  rows.forEach(([nm, px, fix], ri) => {
+    const y0 = 24 + ri * RH;
+    label(c, nm, 8, y0 + RH / 2 + 2, "left");
+    order.forEach(([k, t], i) => {
+      const [a, b] = EXT[k], s = px ? px / (b - a) : fix, cy = px ? y0 + 12 + (-a) * s : y0 + 56;
+      c.save(); c.translate(LX + i * CW + CW / 2, cy); c.scale(s, s);
+      drawUnit(c, k, t, Math.max(LW, 1.4 / s * (px ? 1 : 1)), { ...base(t), plain: false, shield: k === "S" ? 1 : undefined }); c.restore();
+    });
+  });
+}
 </script>
+</html>
