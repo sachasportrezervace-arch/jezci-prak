@@ -89,98 +89,179 @@
   /* ---------- herní HUD ---------- */
   #hud { position: fixed; inset: 0; pointer-events: none; }
   #hud > * { pointer-events: auto; }
-  .top { position: absolute; left: 0; right: 0; top: 0; padding: max(10px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 0 max(10px, env(safe-area-inset-left));
-    display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; pointer-events: none; }
-  .plate { pointer-events: auto; display: flex; align-items: center; gap: 8px; background: var(--paper); border: 3px solid var(--ink); border-radius: 18px; padding: 4px 10px 4px 6px;
-    box-shadow: 0 6px 14px -8px rgba(43, 22, 56, .6); max-width: 100%; min-width: 0; transition: box-shadow .2s, transform .2s; }
+  .top { position: absolute; left: 0; right: 0; top: 0; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: start; gap: 6px; pointer-events: none; }
+  .plate { pointer-events: auto; display: grid; gap: 3px; background: var(--paper); border: 3px solid var(--ink); border-radius: 16px; padding: 4px 8px 6px 11px;
+    box-shadow: inset 5px 0 0 var(--ham), 0 6px 14px -8px rgba(43, 22, 56, .6); min-width: 0; width: 100%; max-width: 300px; transition: box-shadow .2s; }
   .plate.x { justify-self: start; }
-  .plate.o { justify-self: end; flex-direction: row-reverse; padding: 4px 6px 4px 10px; }
-  .plate.turn { box-shadow: 0 0 0 4px var(--lime), 0 6px 14px -8px rgba(43, 22, 56, .6); }
-  .plate .nm { font-weight: 800; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-  .lives { display: flex; gap: 2px; flex: none; } .lives img { width: 26px; height: 26px; display: block; }
-  .mid { display: grid; justify-items: center; gap: 6px; pointer-events: none; }
+  .plate.o { justify-self: end; padding: 4px 11px 6px 8px; box-shadow: inset -5px 0 0 var(--owl), 0 6px 14px -8px rgba(43, 22, 56, .6); }
+  .plate.x.turn { box-shadow: inset 5px 0 0 var(--ham), 0 0 0 4px var(--lime), 0 6px 14px -8px rgba(43, 22, 56, .6); }
+  .plate.o.turn { box-shadow: inset -5px 0 0 var(--owl), 0 0 0 4px var(--lime), 0 6px 14px -8px rgba(43, 22, 56, .6); }
+  .plate.o > * { flex-direction: row-reverse; }
+  .pl1 { display: flex; align-items: center; gap: 5px; min-width: 0; min-height: 22px; }
+  .nm { font-weight: 800; font-size: 15px; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .tt { flex: none; font-size: 11px; font-weight: 800; background: var(--ink); color: #FFD84A; border-radius: 999px; padding: 0 7px 1px; line-height: 1.55; white-space: nowrap; }
+  .hand { width: 26px; height: 26px; flex: none; margin: -3px 0 -3px auto; display: block; }
+  .plate.o .hand { margin: -3px auto -3px 0; }
+  .kbar { display: flex; align-items: center; gap: 4px; }
+  .crown { width: 19px; height: 14px; flex: none; fill: #FFD84A; stroke: var(--ink); stroke-width: 2.2; stroke-linejoin: round; }
+  .ktrack { flex: 1; min-width: 36px; height: 12px; border: 2.5px solid var(--ink); border-radius: 999px; background: #EADFC8; overflow: hidden; position: relative; }
+  .kfill { position: absolute; top: 0; bottom: 0; left: 0; width: 100%; transition: width .45s, background .45s; }
+  .plate.o .kfill { left: auto; right: 0; }
+  .kn { font-weight: 800; font-size: 13px; line-height: 1; font-variant-numeric: tabular-nums; min-width: 2ch; text-align: center; }
+  .pills { display: flex; gap: 3px; }
+  .pill { --hp: 100; --hc: var(--grass); width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    background: conic-gradient(var(--hc) calc(var(--hp) * 1%), rgba(43, 22, 56, .14) 0); }
+  .pill img { width: 18px; height: 18px; border-radius: 50%; background: var(--paper); display: block; }
+  .pill.sh { box-shadow: 0 0 0 2px #3E9BFF; }
+  .pill.out { background: rgba(43, 22, 56, .1); } .pill.out img { opacity: .4; filter: grayscale(1); }
+  .mid { display: grid; justify-items: center; gap: 4px; pointer-events: none; max-width: 110px; }
   .score { pointer-events: auto; font-family: "Titan One", sans-serif; font-size: 22px; line-height: 1; background: var(--ink); color: var(--paper); border-radius: 14px; padding: 6px 12px 7px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .score b { font-weight: 400; } .score .x { color: #FFB27F; } .score .o { color: #CDB5FF; }
-  .status { position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 58px); pointer-events: none;
+  .turnno { font-weight: 800; font-size: 13px; line-height: 1.4; background: var(--paper); border: 2.5px solid var(--ink); border-radius: 999px; padding: 0 9px 1px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .modchip { pointer-events: auto; display: flex; align-items: center; gap: 4px; font-weight: 800; font-size: 12.5px; line-height: 1.15; text-align: left;
+    background: var(--ink); color: var(--paper); border-radius: 12px; padding: 2px 9px 3px 5px; }
+  .mi { display: grid; flex: none; }
+  .mi svg, .bn-ic svg { display: none; width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .modchip[data-m="v"] .m-v, .modchip[data-m="n"] .m-n, .modchip[data-m="i"] .m-i, .modchip[data-m="g"] .m-g { display: block; }
+  .modchip[data-m="v"] .mi { color: #9FE3FF; } .modchip[data-m="n"] .mi { color: #FFE38A; } .modchip[data-m="i"] .mi { color: #CFF3FF; } .modchip[data-m="g"] .mi { color: #D8C6FF; }
+  .status { position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(8px, env(safe-area-inset-top)) + 86px); pointer-events: none;
     background: var(--lime); border: 3px solid var(--ink); border-radius: 999px; padding: 3px 14px 4px; font-weight: 800; font-size: 16px; white-space: nowrap; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis;
     box-shadow: 0 6px 14px -8px rgba(43, 22, 56, .6); }
   .status.wait { background: var(--paper); }
   @media (max-width: 899px), (pointer: coarse) { .status { max-width: calc(100vw - 140px); } }
   .status.pulse { animation: pulse 1.6s ease-in-out infinite; }
   @keyframes pulse { 50% { transform: translateX(-50%) scale(1.05); } }
-  .tools { position: absolute; right: max(10px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 62px); display: flex; flex-direction: column; gap: 8px; }
+  .tools { position: absolute; right: max(8px, env(safe-area-inset-right)); top: calc(max(8px, env(safe-area-inset-top)) + 86px); display: flex; flex-direction: column; gap: 8px; }
   .tools .lbl { display: none; }
-  .meter { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); pointer-events: none; font-weight: 800; font-size: 15px;
-    background: var(--paper); border: 3px solid var(--ink); border-radius: 999px; padding: 2px 12px 3px; font-variant-numeric: tabular-nums; }
-  .hint { position: absolute; left: 50%; width: max-content; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); pointer-events: none; text-align: center; font-weight: 700; font-size: 15px;
-    color: var(--ink); background: rgba(255, 248, 234, .92); border: 3px solid var(--ink); border-radius: 16px; padding: 4px 14px 5px; max-width: min(92vw, 420px); text-wrap: balance; }
+  .meter, .hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(8px, env(safe-area-inset-bottom)) + 128px); pointer-events: none; }
+  .meter { font-weight: 800; font-size: 15px; background: var(--paper); border: 3px solid var(--ink); border-radius: 999px; padding: 2px 12px 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .hint { width: max-content; text-align: center; font-weight: 700; font-size: 15px; color: var(--ink); background: rgba(255, 248, 234, .94); border: 3px solid var(--ink); border-radius: 16px;
+    padding: 4px 14px 5px; max-width: min(92vw, 420px); text-wrap: balance; }
   .waitbox { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); display: grid; gap: 8px; justify-items: center;
     background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; padding: 10px 14px 12px; width: min(92vw, 380px); text-align: center; box-shadow: var(--shadow); }
   .waitbox p { margin: 0; font-weight: 700; text-wrap: balance; }
+  .notice { position: absolute; left: 50%; top: calc(max(8px, env(safe-area-inset-top)) + 124px); transform: translateX(-50%); width: max-content; max-width: min(92vw, 440px);
+    background: #FFD84A; border: 3px solid var(--ink); border-radius: 16px; padding: 6px 14px 7px; font-weight: 800; font-size: 15px; text-align: center; text-wrap: balance; box-shadow: var(--shadow); pointer-events: none; }
+  .notice.go { animation: pop .5s cubic-bezier(.2, 1.4, .4, 1) both; }
+  @keyframes pop { from { transform: translateX(-50%) scale(.6); opacity: 0; } }
 
-  /* výběr ježka pro soupeře (twist) */
-  .pickbox { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom)); width: min(96vw, 560px);
-    background: var(--paper); border: 3px solid var(--ink); border-radius: 22px; padding: 10px 10px 12px; box-shadow: var(--shadow); display: grid; gap: 8px; }
-  .pickbox h3 { margin: 0; font-size: 17px; font-weight: 800; text-align: center; }
-  .pickbox .note { margin: 0; text-align: center; font-size: 13px; }
-  .kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .kind { --c: #fff; --cd: #E6D3AE; flex-direction: column; justify-content: flex-start; gap: 1px; padding: 6px 4px calc(6px + var(--lip)); min-height: 112px; font-size: 14px; text-align: center; }
-  .kind[aria-pressed="true"] { --c: var(--lime); --cd: #8DB51C; }
-  .kind:disabled { --c: #EFE6D2; --cd: #DCCFB3; filter: none; opacity: .62; cursor: not-allowed; }
-  .kind img { width: 48px; height: 48px; display: block; }
-  .kind .kt { display: contents; }
+  /* spodní lišta: ježek v ruce, Střelba / Stavba, díly, výběr ježka */
+  kbd { display: none; font: 700 12px/1 "Baloo 2", sans-serif; border: 2px solid currentColor; border-radius: 6px; padding: 2px 5px 1px; opacity: .55; }
+  .dock { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(8px, env(safe-area-inset-bottom)); width: min(calc(100vw - 16px), 560px);
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 22px; padding: 8px; box-shadow: var(--shadow); }
+  .turnrow { display: grid; grid-template-columns: 1fr 1fr 1fr 52px; grid-template-areas: "hand hand hand hand" "shoot shoot build build"; gap: 6px 8px; }
+  .dock.building .turnrow { grid-template-areas: "hand hand hand hand" "pcs pcs pcs rot" "shoot build place place"; }
+  .handrow { grid-area: hand; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 0 2px; }
+  .handrow img { width: 40px; height: 40px; flex: none; }
+  .handrow b { display: block; font-weight: 800; font-size: 16px; line-height: 1.1; }
+  .handrow span { display: block; font-size: 13px; font-weight: 600; color: var(--ink-2); line-height: 1.2; text-wrap: pretty; }
+  #modeShoot { grid-area: shoot; } #modeBuild { grid-area: build; }
+  .mode { --c: #fff; --cd: #E6D3AE; min-height: 52px; gap: 6px; padding-inline: 10px; font-size: 17px; }
+  .mode[aria-pressed="true"] { --c: var(--lime); --cd: #8DB51C; }
+  .mode.off { --c: #EFE6D2; --cd: #DCCFB3; color: var(--ink-2); }
+  .mode .cnt { min-width: 24px; height: 24px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 14px; line-height: 1; display: inline-grid; place-items: center; padding: 0 6px 1px; }
+  .mode.off .cnt { background: var(--ink-2); }
+  .buildrow { display: contents; }
+  .pieces { grid-area: pcs; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .piece { --c: #fff; --cd: #E6D3AE; min-height: 52px; padding: 3px 6px calc(3px + var(--lip)); gap: 4px; font-size: 15px; }
+  .piece img { width: 36px; height: 36px; flex: none; display: block; }
+  .piece .pt { display: grid; text-align: left; } .piece .pt b { font-weight: 800; } .piece .pt small { display: none; font-weight: 600; font-size: 12px; color: var(--ink-2); line-height: 1.15; }
+  .piece[aria-pressed="true"] { --c: var(--lime); --cd: #8DB51C; }
+  #rotBtn { grid-area: rot; width: 52px; height: 52px; min-height: 52px; }
+  #rotBtn:disabled { opacity: .45; cursor: not-allowed; }
+  .place { grid-area: place; --c: var(--ham); --cd: var(--ham-d); color: #fff; }
+  .place.off { --c: #F3DCCB; --cd: #E0BFA3; color: #9A6A55; }
+  .why { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); margin: 0; white-space: nowrap; background: var(--paper); border: 3px solid var(--ink); border-radius: 999px;
+    padding: 2px 12px 3px; font-weight: 700; font-size: 14px; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+  .why:empty { display: none; }
+  .why.bad { background: #FFE0D8; color: #8A2418; }
+  .pickrow { display: grid; gap: 6px; }
+  .pickrow h3 { margin: 0; font-size: 16px; font-weight: 800; text-align: center; }
+  .kinds { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .kind { --c: #fff; --cd: #E6D3AE; flex-direction: column; gap: 0; padding: 4px 2px calc(4px + var(--lip)); min-height: 70px; font-size: 13px; text-align: center; }
+  .kind img { width: 40px; height: 40px; display: block; }
   .kind .kn { font-weight: 800; line-height: 1.1; }
-  .kind .ki { font-weight: 600; font-size: 12px; color: var(--ink-2); line-height: 1.15; text-wrap: balance; }
-  .kind[aria-pressed="true"] .ki { color: var(--ink); }
-  .hogchip { position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 106px); pointer-events: none; display: flex; align-items: center; gap: 8px;
-    background: var(--paper); border: 3px solid var(--ink); border-radius: 18px; padding: 3px 14px 3px 6px; box-shadow: 0 6px 14px -8px rgba(43, 22, 56, .6); max-width: min(92vw, 420px, calc(100vw - 150px)); }
-  .hogchip img { width: 40px; height: 40px; flex: none; display: block; }
-  .hogchip b { display: block; font-weight: 800; font-size: 16px; line-height: 1.1; }
-  .hogchip span { display: block; font-weight: 600; font-size: 13px; color: var(--ink-2); line-height: 1.15; text-wrap: balance; }
+  .kind[aria-pressed="true"] { --c: var(--lime); --cd: #8DB51C; }
+  .kind:disabled { --c: #EFE6D2; --cd: #DCCFB3; filter: none; opacity: .55; cursor: not-allowed; }
+  .pickrow .note { margin: 0; text-align: center; font-size: 14px; font-weight: 700; min-height: 1.4em; }
+  .pickfoot { display: flex; align-items: center; gap: 10px; }
+  .pickfoot span { font-size: 13px; font-weight: 700; color: var(--ink-2); flex: none; }
+  .pickfoot .btn { flex: 1; }
+
+  /* karta partie */
+  .banner { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(calc(100vw - 32px), 400px); z-index: 5; cursor: pointer;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 26px; padding: 14px 18px 16px; box-shadow: var(--shadow); display: grid; gap: 10px; }
+  .banner.go { animation: drop .5s cubic-bezier(.2, 1.4, .4, 1) both; }
+  .bn-k { font-family: "Titan One", sans-serif; font-size: 26px; line-height: 1.1; text-align: center; }
+  .bn-row { display: flex; gap: 12px; align-items: center; }
+  .bn-ic { width: 46px; height: 46px; flex: none; border-radius: 14px; border: 3px solid var(--ink); display: grid; place-items: center; background: #FFE38A; color: var(--ink); }
+  .bn-ic svg { width: 26px; height: 26px; }
+  .bn-ic.map { background: var(--grass); } .bn-ic.map svg { display: block; fill: var(--paper); }
+  #bnModIcon[data-m="v"] { background: #BDEFFF; } #bnModIcon[data-m="n"] { background: #3A3F7A; color: #FFE38A; } #bnModIcon[data-m="i"] { background: #DDF6FF; } #bnModIcon[data-m="g"] { background: #D8C6FF; }
+  #bnModIcon[data-m="v"] .m-v, #bnModIcon[data-m="n"] .m-n, #bnModIcon[data-m="i"] .m-i, #bnModIcon[data-m="g"] .m-g, #bnModIcon[data-m="-"] .m-0 { display: block; }
+  .bn-row b { display: block; font-weight: 800; font-size: 18px; line-height: 1.15; }
+  .bn-row span { display: block; font-size: 14.5px; color: var(--ink-2); line-height: 1.25; text-wrap: pretty; }
+  .bn-start { justify-self: center; font-weight: 800; background: var(--lime); border: 3px solid var(--ink); border-radius: 999px; padding: 2px 14px 3px; }
+  .mapline { margin: 0; font-weight: 700; font-size: 15px; background: var(--paper-2); border-radius: 14px; padding: 8px 12px; text-wrap: pretty; }
+  .rules { margin: 0; padding-left: 20px; } .rules li { margin: 3px 0; }
 
   /* konec */
   .end { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vw, 420px); text-align: center; }
   .end.go { animation: drop .55s cubic-bezier(.2, 1.4, .4, 1) both; }
   @keyframes drop { from { transform: translate(-50%, -90%) scale(.8); opacity: 0; } }
-  /* na výšku stojí konec hry a výběr ježka v nebi, ať nezakrývají pevnosti ani výsledek posledního výstřelu */
   @keyframes dropB { from { transform: translate(-50%, 40px) scale(.9); opacity: 0; } }
-  @media (orientation: portrait) and (max-width: 600px) {
-    .pickbox { left: calc(50% - 34px); width: calc(100vw - 92px); top: 112px; bottom: auto; transform: translateX(-50%); padding: 10px 10px 12px; gap: 8px; }
-    .pickbox .note { display: none; } .pickbox h3 { font-size: 16px; }
-    .pickbox .kinds { grid-template-columns: 1fr 1fr; gap: 6px; }
-    .pickbox .kind { flex-direction: row; justify-content: flex-start; align-items: center; text-align: left; gap: 6px; min-height: 58px; padding: 4px 8px calc(4px + var(--lip)); font-size: 14px; }
-    .pickbox .kind .kt { display: grid; gap: 0; } .pickbox .kind .ki { font-size: 11px; } .pickbox .kind img { width: 34px; height: 34px; flex: none; }
-    .end { top: 120px; bottom: auto; left: calc(50% - 34px); width: min(calc(100vw - 92px), 420px); transform: translateX(-50%); }
-    .end.go { animation-name: dropB; }
-  }
-  /* nižší telefony na výšku (SE, menší Androidy): pevnost je výš, výběr ježka je jedna řada ikon a konec hry kompaktní */
-  @media (orientation: portrait) and (max-width: 600px) and (max-height: 740px) {
-    .pickbox { top: 104px; padding: 8px 8px 10px; gap: 6px; }
-    .pickbox h3 { display: none; }
-    .pickbox .kinds { grid-template-columns: repeat(4, 1fr); gap: 5px; }
-    .pickbox .kind { flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 1px; min-height: 68px; padding: 4px 2px calc(4px + var(--lip)); font-size: 12.5px; }
-    .pickbox .kind .kt { display: contents; } .pickbox .kind .ki { display: none; } .pickbox .kind img { width: 34px; height: 34px; }
-    .end { top: 104px; padding: 12px 14px 14px; }
-    .card.end h2 { font-size: 28px; } .card.end .series { margin: 2px 0; font-size: 18px; } .card.end .stake { margin-bottom: 8px; font-size: 15px; }
-  }
+  .end .kicker { font-weight: 800; font-size: 14px; color: var(--ink-2); margin-bottom: 2px; }
   .end h2 { font-size: clamp(30px, 8vw, 40px); margin-bottom: 4px; }
   .end .series { font-family: "Titan One", sans-serif; font-size: 20px; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+  .end .rank { display: inline-block; margin: 2px 0 8px; font-weight: 800; background: var(--ink); color: #FFD84A; border-radius: 999px; padding: 2px 12px 3px; }
   .end .stake { font-weight: 700; margin: 0 0 14px; text-wrap: balance; }
+  /* na výšku stojí konec hry v nebi, ať nezakrývá pevnost ani výsledek posledního výstřelu */
+  @media (orientation: portrait) and (max-width: 600px) {
+    .end { top: 150px; bottom: auto; left: calc(50% - 30px); width: min(calc(100vw - 84px), 420px); transform: translateX(-50%); padding: 14px 16px 16px; }
+    .end.go { animation-name: dropB; }
+    .end h2 { font-size: 30px; }
+    .dock { padding: 7px; border-radius: 20px; }
+    .dock.building .turnrow { grid-template-areas: "pcs pcs pcs rot" "shoot build place place"; }
+    .dock.building .handrow { display: none; }
+    .piece { flex-direction: column; gap: 0; font-size: 13px; padding-inline: 2px; } .piece img { width: 30px; height: 30px; } .piece .pt { text-align: center; }
+    .dock.picking .pickrow h3, .pickfoot span { display: none; }
+    .pickrow .note { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); width: max-content; max-width: calc(100vw - 24px); background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 2px 12px 3px; font-size: 14px; }
+    .pickrow .note:empty { display: none; }
+    .kind { min-height: 64px; font-size: 12.5px; } .kind img { width: 36px; height: 36px; }
+  }
+  @media (orientation: portrait) and (max-width: 600px) and (max-height: 740px) {
+    .end { top: 128px; padding: 10px 14px 12px; }
+    .card.end h2 { font-size: 26px; } .card.end .series { margin: 2px 0; font-size: 18px; } .card.end .stake { margin-bottom: 8px; font-size: 15px; }
+    .handrow span { display: none; }
+  }
 
   /* listy */
   dialog { border: 3px solid var(--ink); border-radius: 26px; background: var(--paper); color: var(--ink); padding: 20px; width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; box-shadow: var(--shadow); }
   dialog::backdrop { background: rgba(43, 22, 56, .45); }
   dialog ul { padding-left: 20px; margin: 8px 0 16px; } dialog li { margin: 6px 0; }
   .menu { display: grid; gap: 10px; }
-  .toast { position: fixed; left: 50%; top: calc(max(10px, env(safe-area-inset-top)) + 100px); transform: translateX(-50%); z-index: 10; background: var(--ink); color: var(--paper);
+  .toast { position: fixed; left: 50%; top: calc(max(10px, env(safe-area-inset-top)) + 124px); transform: translateX(-50%); z-index: 10; background: var(--ink); color: var(--paper);
     border-radius: 14px; padding: 8px 16px; font-weight: 700; max-width: 90vw; text-align: center; }
   @media (max-width: 420px) {
-    .plate { gap: 5px; padding-right: 8px; } .plate.o { padding-left: 8px; } .plate .nm { font-size: 14px; } .lives { gap: 0; } .lives img { width: 19px; height: 19px; } .score { font-size: 18px; }
-    .kinds { gap: 5px; } .kind { font-size: 13px; padding-inline: 2px; min-height: 118px; } .kind .ki { font-size: 11px; } .kind img { width: 42px; height: 42px; }
+    .top { gap: 4px; }
+    .plate { padding: 3px 6px 5px 9px; border-radius: 14px; } .plate.o { padding: 3px 9px 5px 6px; }
+    .nm { font-size: 14px; } .score { font-size: 18px; padding: 5px 10px 6px; }
+    .pills { gap: 2px; } .pill { width: 18px; height: 18px; } .pill img { width: 14px; height: 14px; }
+    .crown { width: 16px; } .tt { font-size: 10px; padding: 0 5px 1px; } .hand { width: 22px; height: 22px; }
+    .mid { max-width: 88px; } .modchip { font-size: 11.5px; }
   }
+  /* telefon na šířku: tenký horní pruh, lišta vpravo u palce */
   @media (max-height: 430px) and (orientation: landscape) {
-    .status { top: calc(max(8px, env(safe-area-inset-top)) + 46px); font-size: 14px; padding: 1px 12px 2px; }
+    .top { padding-right: calc(max(8px, env(safe-area-inset-right)) + 54px); }
+    .plate { grid-template-columns: minmax(40px, 1fr) auto; gap: 2px 6px; max-width: 330px; padding-block: 3px 4px; }
+    .plate.o { direction: rtl; } .plate.o > * { direction: ltr; }
+    .pl1 { grid-column: 1 / -1; min-height: 20px; }
+    .status { top: calc(max(8px, env(safe-area-inset-top)) + 62px); font-size: 14px; padding: 1px 12px 2px; }
     .hint { display: none; }
+    .notice { top: calc(max(8px, env(safe-area-inset-top)) + 96px); }
+    .tools { top: max(8px, env(safe-area-inset-top)); gap: 6px; }
+    .tools .icon { width: 44px; height: 44px; min-height: 44px; }
     .layer { padding-block: 10px; }
     .card { width: min(560px, 100%); padding: 12px 18px 14px; border-radius: 22px; }
     .card .cast { display: none; } .logo { font-size: 34px; margin-bottom: 6px; text-shadow: 0 3px 0 var(--ink); -webkit-text-stroke-width: 2.5px; } h2 { font-size: 22px; } .lead { margin-bottom: 8px; font-size: 15px; }
@@ -188,44 +269,49 @@
     #setup .lead { display: none; }
     #setupForm { grid-template-columns: 1fr 1fr; align-items: end; }
     #setupForm .row2, #setupForm #setupSubmit, #setupForm #customWrap { grid-column: 1 / -1; } .btn { min-height: 44px; font-size: 16px; padding-block: 6px calc(6px + var(--lip)); }
+    .rules { display: none; }
     .status.pulse { animation: none; }
     .end { top: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(42vw, 360px); padding: 8px 12px 10px; }
     .end.go { animation-name: dropB; } .end h2 { font-size: 24px; } .end .series { font-size: 16px; margin: 2px 0; } .end .stake { margin-bottom: 6px; font-size: 14px; }
-    /* na šířku stojí výběr na prázdném kopci mezi pevnostmi, ať nezakrývá cíl ani výsledek výstřelu */
-    .pickbox { width: min(42vw, 360px); left: 50%; right: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 6px 8px 8px; gap: 4px; }
-    .pickbox h3, .pickbox .note { display: none; }
-    .kinds { grid-template-columns: 1fr 1fr; gap: 5px; }
-    .kind { flex-direction: row; justify-content: flex-start; align-items: center; gap: 6px; min-height: 46px; padding: 3px 8px calc(3px + var(--lip)); font-size: 14px; }
-    .kind .ki { display: none; } .kind img { width: 30px; height: 30px; flex: none; } .pickbox .btn { min-height: 44px; }
-    .hogchip { top: calc(max(8px, env(safe-area-inset-top)) + 80px); } .hogchip span { display: none; } .hogchip img { width: 32px; height: 32px; }
-    .meter { bottom: max(10px, env(safe-area-inset-bottom)); }
-  }
-  @media (max-height: 430px) and (orientation: landscape) {
-    .tools { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); gap: 6px; }
-    .tools .icon { width: 44px; height: 44px; min-height: 44px; }
-    .top { padding-right: calc(max(10px, env(safe-area-inset-right)) + 54px); }
+    .dock { left: auto; right: max(8px, env(safe-area-inset-right)); transform: none; bottom: max(8px, env(safe-area-inset-bottom)); width: 300px; padding: 6px; border-radius: 18px; }
+    .dock.building .turnrow { grid-template-areas: "pcs pcs pcs rot" "shoot build place place"; }
+    .dock.building .handrow { display: none; }
+    .turnrow { gap: 5px 6px; grid-template-columns: 1fr 1fr 1fr 46px; }
+    .mode, .piece, .place { min-height: 46px; font-size: 15px; } #rotBtn { width: 46px; height: 46px; min-height: 46px; }
+    .piece { flex-direction: column; gap: 0; font-size: 12.5px; padding-inline: 2px; } .piece img { width: 26px; height: 26px; } .piece .pt { text-align: center; }
+    .handrow img { width: 32px; height: 32px; } .handrow span { font-size: 12px; }
+    .pickrow h3, .pickfoot span { display: none; }
+    .kind { min-height: 54px; font-size: 11.5px; padding-inline: 1px; } .kind img { width: 30px; height: 30px; }
+    .pickrow .note { font-size: 12.5px; min-height: 0; }
+    .why { left: auto; right: 0; transform: none; white-space: normal; width: max-content; max-width: 300px; }
+    .meter { bottom: max(10px, env(safe-area-inset-bottom)); left: calc(50% - 150px); }
+    .banner { width: min(calc(100vw - 32px), 460px); padding: 10px 16px 12px; gap: 6px; } .bn-k { font-size: 21px; }
   }
   /* ---------- desktop: vlastní rozvržení (myš, velká obrazovka) ---------- */
   @media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 560px) {
-    .top { padding: 18px 24px 0; gap: 16px; }
-    .plate { padding: 6px 16px 6px 8px; gap: 12px; border-radius: 22px; }
-    .plate.o { padding: 6px 8px 6px 16px; }
-    .plate .nm { font-size: 22px; }
-    .lives img { width: 38px; height: 38px; }
+    .top { padding: 16px 24px 0; gap: 16px; }
+    .plate { grid-template-columns: minmax(80px, 1fr) auto; gap: 4px 10px; max-width: 420px; padding: 6px 14px 8px 16px; border-radius: 20px; }
+    .plate.o { padding: 6px 16px 8px 14px; direction: rtl; } .plate.o > * { direction: ltr; }
+    .pl1 { grid-column: 1 / -1; min-height: 28px; }
+    .nm { font-size: 21px; } .tt { font-size: 13px; padding: 0 9px 1px; } .hand { width: 32px; height: 32px; }
+    .ktrack { height: 16px; } .kn { font-size: 15px; } .crown { width: 22px; height: 17px; }
+    .pill { width: 28px; height: 28px; } .pill img { width: 23px; height: 23px; } .pills { gap: 4px; }
+    .mid { max-width: 160px; }
     .score { font-size: 30px; padding: 8px 16px 9px; border-radius: 16px; }
-    .status { top: 92px; font-size: 19px; padding: 4px 20px 6px; }
-    .tools { top: auto; bottom: 20px; right: 24px; flex-direction: row; gap: 10px; }
-    .tools .btn { width: auto; padding: 6px 14px calc(6px + var(--lip)); gap: 8px; font-size: 16px; }
-    .tools .lbl { display: inline; }
-    .hint, .meter, .waitbox { top: 96px; bottom: auto; left: 24px; transform: none; font-size: 17px; }
+    .turnno, .modchip { font-size: 14px; }
+    .status { top: 128px; font-size: 19px; padding: 4px 20px 6px; }
+    .notice { top: 176px; font-size: 17px; }
+    .tools { top: 128px; right: 24px; flex-direction: row; gap: 10px; }
+    .hint, .meter, .waitbox { top: 128px; bottom: auto; left: 24px; transform: none; font-size: 17px; }
     .hint { max-width: 330px; text-align: left; }
-    .pickbox { left: 50%; right: auto; top: auto; bottom: 84px; transform: translateX(-50%); width: 440px; padding: 12px 14px 14px; gap: 8px; }
-    .pickbox h3 { font-size: 18px; }
-    .pickbox .note { display: none; }
-    .kinds { grid-template-columns: 1fr 1fr; gap: 8px; }
-    .kind { flex-direction: row; justify-content: flex-start; align-items: center; text-align: left; gap: 10px; min-height: 64px; padding: 6px 12px calc(6px + var(--lip)); font-size: 16px; }
-    .kind .kt { display: grid; gap: 1px; } .kind .ki { font-size: 12px; } .kind img { width: 44px; height: 44px; flex: none; }
-    .hogchip { top: 138px; }
+    kbd { display: inline-block; }
+    .dock { bottom: 20px; width: min(600px, calc(100vw - 500px)); padding: 10px; }
+    .turnrow { grid-template-columns: 1fr 1fr 1fr 56px; }
+    .mode, .place { min-height: 56px; font-size: 18px; } #rotBtn { width: 56px; height: 56px; min-height: 56px; }
+    .piece { min-height: 64px; } .piece .pt small { display: block; } .piece img { width: 40px; height: 40px; }
+    .handrow img { width: 46px; height: 46px; } .handrow b { font-size: 18px; } .handrow span { font-size: 14px; }
+    .kind { min-height: 84px; font-size: 14px; } .kind img { width: 48px; height: 48px; }
+    .pickrow h3 { font-size: 18px; }
     .end { width: 460px; }
     #stage.pan { cursor: move; }
   }
@@ -242,7 +328,7 @@
 <section class="layer" id="setup" hidden>
   <div class="card">
     <h1 class="logo">Ježko<span>met</span></h1>
-    <p class="lead">Prak, stočený ježek a dvě pevnosti. Střílíte po sobě, kdo první shodí všechny tři soupeřovy postavičky, vyhrává.</p>
+    <p class="lead">Prak, stočený ježek a dvě pevnosti s králem. Střílíte nebo stavíte po sobě, kdo první shodí soupeřova krále, vyhrává.</p>
     <div class="cast" id="setupCast" aria-hidden="true"></div>
     <form id="setupForm" class="stack" autocomplete="off">
       <div class="row2">
@@ -294,10 +380,12 @@
     <h2 id="introTitle"></h2>
     <p class="lead" id="introMeta" style="margin:0"></p>
     <div class="cast" id="introCast" aria-hidden="true"></div>
-    <ul style="margin:0;padding-left:20px">
-      <li>Chyť ježka v praku, táhni ho dozadu a pusť.</li>
-      <li>Postavička vypadne, když spadne na zem nebo dostane pořádnou ránu.</li>
-      <li>Ježka na další výstřel ti vybírá soupeř: obyčejného, kamenného, gumového nebo bouchacího, každého jednou za dávku.</li>
+    <p class="mapline" id="introMap"></p>
+    <ul class="rules">
+      <li>Shoď soupeřova krále na zem, nebo mu vyraz všechen život.</li>
+      <li>V tahu buď vystřelíš ježka, kterého ti vybral soupeř, nebo postavíš jeden díl.</li>
+      <li>Tlusťoch odráží, Štítonoš kryje zepředu, Skokan uhýbá a Léčitel léčí.</li>
+      <li>Kdo výrazně prohrává, dostane jednou stavbu navíc.</li>
     </ul>
     <button class="btn wide" id="acceptBtn" type="button">Přijmout výzvu</button>
     <button class="btn paper small" id="introMine" type="button">Tohle je moje hra (jiný prohlížeč)</button>
@@ -316,20 +404,64 @@
 <!-- hra -->
 <div id="hud" hidden>
   <div class="top">
-    <div class="plate x" id="plateX"><div class="lives" id="livesX"></div><span class="nm" id="nmX"></span></div>
-    <div class="mid"><div class="score" id="score" aria-label="Skóre série"></div></div>
-    <div class="plate o" id="plateO"><div class="lives" id="livesO"></div><span class="nm" id="nmO"></span></div>
+    <div class="plate x" id="plateX">
+      <div class="pl1"><span class="nm" id="nmX"></span><span class="tt" id="ttX" hidden></span><img class="hand" id="handX" alt="" width="28" height="28" hidden></div>
+      <div class="kbar" id="kbarX" role="img"><svg class="crown" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 15L3 4l5 5 4-7 4 7 5-5 1 11z"/></svg><span class="ktrack"><span class="kfill" id="kbX"></span></span><span class="kn" id="kbnX"></span></div>
+      <div class="pills" id="pillsX" role="img"></div>
+    </div>
+    <div class="mid">
+      <div class="score" id="score" aria-label="Skóre série"></div>
+      <div class="turnno" id="turnNo"></div>
+      <div class="modchip" id="modChip" hidden><span class="mi" aria-hidden="true">
+        <svg class="m-v" id="modArrow" viewBox="0 0 24 24"><path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3"/></svg>
+        <svg class="m-n" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+        <svg class="m-i" viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9 4l3 3 3-3M9 20l3-3 3 3"/></svg>
+        <svg class="m-g" viewBox="0 0 24 24"><path d="M5 19c4-1 9-6 12-14M7 15c3 0 6-1 8-3M9 11c2 0 4 0 6-1"/></svg>
+      </span><span id="modLbl"></span></div>
+    </div>
+    <div class="plate o" id="plateO">
+      <div class="pl1"><span class="nm" id="nmO"></span><span class="tt" id="ttO" hidden></span><img class="hand" id="handO" alt="" width="28" height="28" hidden></div>
+      <div class="kbar" id="kbarO" role="img"><svg class="crown" viewBox="0 0 24 18" aria-hidden="true"><path d="M2 15L3 4l5 5 4-7 4 7 5-5 1 11z"/></svg><span class="ktrack"><span class="kfill" id="kbO"></span></span><span class="kn" id="kbnO"></span></div>
+      <div class="pills" id="pillsO" role="img"></div>
+    </div>
   </div>
   <div class="status" id="status"></div>
-    <div class="meter" id="meter" hidden></div>
+  <div class="meter" id="meter" hidden></div>
   <div class="hint" id="hint" hidden></div>
+  <div class="notice" id="notice" role="status" hidden></div>
   <div class="waitbox" id="waitBox" hidden><p id="waitText"></p><button class="btn small" id="waitCopy" type="button">Zkopírovat odkaz</button></div>
-  <div class="hogchip" id="hogChip" hidden><img id="hcIcon" alt="" width="40" height="40"><div><b id="hcName"></b><span id="hcInfo"></span></div></div>
-  <div class="pickbox" id="pickBox" hidden>
-    <h3 id="pickTitle">Jakého ježka pošleš soupeři?</h3>
-    <div class="kinds" id="kinds" role="group" aria-label="Druh ježka pro soupeře"></div>
-    <p class="note" id="pickNote"></p>
-    <button class="btn" id="sendBtn" type="button">Poslat ježka</button>
+  <!-- spodní lišta: volba tahu, stavba, výběr ježka pro soupeře -->
+  <div class="dock" id="dock" hidden>
+    <div class="turnrow" id="turnRow">
+      <div class="handrow" id="handRow"><img id="hdIcon" alt="" width="44" height="44"><div><b id="hdName"></b><span id="hdInfo"></span></div></div>
+      <button class="btn tog mode" id="modeShoot" type="button" aria-pressed="true"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 21v-8M17 21v-8M7 13c0-5 1-8-2-10M17 13c0-5-1-8 2-10M7 13c3 3 7 3 10 0"/></svg>Střelba<kbd>Q</kbd></button>
+      <button class="btn tog mode" id="modeBuild" type="button" aria-pressed="false"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="13" width="8" height="7" rx="1"/><rect x="13" y="13" width="8" height="7" rx="1"/><rect x="8" y="4" width="8" height="7" rx="1"/></svg>Stavba<span class="cnt" id="buildLeft"></span><kbd>E</kbd></button>
+      <div class="buildrow" id="buildRow" hidden>
+        <div class="pieces" id="pieces" role="group" aria-label="Díl stavby"></div>
+        <button class="btn paper icon" id="rotBtn" type="button" aria-label="Otočit díl (R)"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 3v5h-5"/></svg></button>
+        <button class="btn place" id="placeBtn" type="button">Postavit<kbd>Enter</kbd></button>
+        <p class="why" id="buildWhy" aria-live="polite"></p>
+      </div>
+    </div>
+    <div class="pickrow" id="pickRow" hidden>
+      <h3 id="pickTitle">Ježek pro soupeře</h3>
+      <div class="kinds" id="kinds" role="group" aria-label="Druh ježka pro soupeře"></div>
+      <p class="note" id="pickNote"></p>
+      <div class="pickfoot"><span id="pickLeft"></span><button class="btn" id="sendBtn" type="button">Poslat ježka</button></div>
+    </div>
+  </div>
+  <!-- karta partie: mapa, modifikátor, kdo začíná -->
+  <div class="banner" id="banner" hidden role="dialog" aria-label="Nová partie">
+    <div class="bn-k">Nová partie</div>
+    <div class="bn-row"><span class="bn-ic map" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2 19l6-9 4 5 3-4 7 8z"/></svg></span><div><b id="bnMap"></b><span id="bnMapT"></span></div></div>
+    <div class="bn-row"><span class="bn-ic" id="bnModIcon" aria-hidden="true">
+      <svg class="m-v" viewBox="0 0 24 24"><path d="M3 9h11a3 3 0 1 0-3-3M3 15h15a3 3 0 1 1-3 3"/></svg>
+      <svg class="m-n" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+      <svg class="m-i" viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9 4l3 3 3-3M9 20l3-3 3 3"/></svg>
+      <svg class="m-g" viewBox="0 0 24 24"><path d="M5 19c4-1 9-6 12-14M7 15c3 0 6-1 8-3M9 11c2 0 4 0 6-1"/></svg>
+      <svg class="m-0" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+    </span><div><b id="bnMod"></b><span id="bnModT"></span></div></div>
+    <div class="bn-start" id="bnStart"></div>
   </div>
   <div class="tools">
     <button class="btn paper icon" id="soundBtn" type="button" aria-label="Zvuk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="soundWave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path id="soundOff" d="M17 9l5 6M22 9l-5 6" hidden/></svg><span class="lbl" id="soundLbl">Zvuk</span></button>
@@ -338,8 +470,10 @@
     <button class="btn paper icon" id="menuBtn" type="button" aria-label="Nabídka"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="lbl">Nabídka</span></button>
   </div>
   <div class="card end" id="endBox" hidden>
+    <div class="kicker" id="endKicker" hidden></div>
     <h2 id="endTitle"></h2>
     <div class="series" id="endSeries"></div>
+    <p class="rank" id="endRank" hidden></p>
     <p class="stake" id="endStake"></p>
     <div class="stack">
       <button class="btn wide" id="endPrimary" type="button"></button>
@@ -371,20 +505,26 @@
 <dialog id="helpSheet" aria-labelledby="helpTitle">
   <h2 id="helpTitle">Jak se hraje</h2>
   <ul>
-    <li><b>Výstřel:</b> chyť ježka v praku a táhni dozadu, tečky ukazují začátek dráhy. Pusť a ježek letí. Na klávesnici šipky a mezerník.</li>
-    <li><b>Kamera:</b> tažením mimo prak posouváš scénu, dvěma prsty (nebo kolečkem myši) přibližuješ. Lupa ukáže celou scénu.</li>
-    <li><b>Vyřazení:</b> postavička vypadne, když spadne na zem nebo ji trefí pořádná rána. Sklo praskne hned, dřevo vydrží víc, kámen nejvíc.</li>
-    <li><b>Ježci:</b> po výstřelu vybereš ježka, kterého střílí soupeř. Obyčejný je poctivý, kamenný boří, gumový skáče, bouchací vybuchne; každý druh dostane jednou, než se dávka obnoví.</li>
-    <li><b>Výhra:</b> kdo první shodí všechny tři soupeřovy postavičky. Pak odveta, skóre série se počítá.</li>
+    <li><b>Cíl:</b> shoď soupeřova krále na zem, nebo mu vyraz všechen život. Ostatní jednotky krále chrání.</li>
+    <li><b>Tah:</b> buď vystřelíš ježka (táhni ho v praku dozadu a pusť, na klávesnici šipky a mezerník), nebo postavíš jeden díl.</li>
+    <li><b>Stavba:</b> štít, blok nebo trám do vlastní pevnosti; nejvýš třikrát za partii (kdo nezačínal, čtyřikrát), nikdy dvakrát po sobě a až od 2. tahu.</li>
+    <li><b>Ježci od soupeře:</b> po výstřelu vybereš ježka, kterého střílí soupeř; každý z pěti druhů jednou za dávku. Ježek, kterého nevystřelíš, ti zůstane na příští tah.</li>
+    <li><b>Ježci:</b> obyčejný je poctivý, kamenný boří, gumový skáče, bouchací vybuchne a špičák prorazí štít.</li>
+    <li><b>Jednotky:</b> Tlusťoch odráží ježky. Štítonoš zastaví zásahy zepředu, dokud štít drží. Skokan třikrát uskočí před ježkem. Léčitel ti na začátku tahu vyléčí 6 životů.</li>
+    <li><b>Mapa a počasí:</b> každá partie má jinou mapu (kopec, údolí s jezírkem, plošiny, skála) a někdy vítr, noc, mráz nebo lehkou gravitaci.</li>
+    <li><b>Šance na návrat:</b> kdo výrazně prohrává (král o třetinu slabší nebo o dvě jednotky méně), dostane jednou za partii stavbu navíc a smí stavět hned.</li>
+    <li><b>Konec:</b> po devátém tahu každého vyhrává ten, kdo má zdravějšího krále. Výhry v sérii přinesou tituly Ostřílený, Mistr praku a Král louky, prapor a korunku.</li>
+    <li><b>Kamera:</b> tažením mimo prak posouváš scénu, dvěma prsty nebo kolečkem přibližuješ, lupa ukáže celou scénu.</li>
   </ul>
   <button class="btn wide" data-close type="button">Jasně</button>
 </dialog>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script src="vendor/matter-0.19.0.min.js"></script>
-<script src="engine.js"></script>
-<script src="art.js"></script>
-<script src="camera.js"></script>
-<script src="game.js"></script>
+<script src="engine.js?v=20"></script>
+<script src="fort.js?v=20"></script>
+<script src="art.js?v=20"></script>
+<script src="camera.js?v=20"></script>
+<script src="game.js?v=20"></script>
 </body>
 </html>

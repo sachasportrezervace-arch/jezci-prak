@@ -2,6 +2,13 @@
 
 PŘEVZATO 31. 10. – dodělává session na účtu P, jiná session sem nepíše.
 
+## 2026-10-31 · Claude (převzetí v2, rozpracováno)
+- Stav: engine, fort.js, game.js, art.js v2 hotové z přerušené session (WIP commit 779bb1a). Doplněno: HUD v2 v `index.html` (lišty krále, pastilky jednotek, Střelba/Stavba, díly, výběr z 5 ježků, karta partie s mapou a modifikátorem, oznámení comebacku, titul na konci), `fort.js` v index, `?v=20`, nápověda a intro v2. Nový `tests/playtest.cjs` (GAMES partií přes odvetu, tabulka).
+- Ověřeno: `node tests/gen.cjs` exit 0 (200 seedů, 100 % do 3 pokusů), `node tests/tune.cjs` exit 0 (determinismus 390/390, kf ≤ 24 kB), kouřový playtest 1 partie exit 0 bez chyb stránky. Sim `playtest-sim.cjs` 30 partií: medián 15 tahů, konec králem 67 %, remíza 3 %.
+- Port: 8803 drží cizí python server Ovocného souboje (PID 39676), Ježkomet běží lokálně na **8823** (`node tools/serve.cjs 8823`, PID v `%TEMP%\jezci-8823.pid`).
+- Riziko: král může padnout 1. ranou (3/12 seedů má takovou ránu, lidská rána kolem nejlepší 4 %). Rozhodne reálný playtest; případná oprava = pád krále na zem jen −35 HP místo vyřazení.
+- Dál: `tests/duel.cjs` přepsat na v2 (je ještě v1), playtest 3 partií (`tests/out/playtest-v2.log`), design-eye, push, živý test.
+
 ## 2026-10-31 · Claude (kolo 5: kamera na všech zařízeních)
 - Zadání se změnilo (koordinátor: velký upgrade hry, král, víc jednotek, náhodné pevnosti): ladění délky partie se v tomto kole nenasazuje a nic se nepushuje. Zůstala jen kamera.
 - Hotovo: kamera je v samostatném `camera.js` (rozhraní v hlavičce): `create`, `resize`, `update(dt, intent)`, `toScreen / toWorld`, `restView`, `panTo`, `pinchStart / Move / End`, `zoomAt`, `toggle / button / release`, `impact`, `snapNext`. `game.js` jen skládá `intent` (výchozí pohled, výstřel s ježkem a jeho rychlostí) a kreslí. Pohyb je kritické tlumení (SmoothDamp) nezávislé na fps, bez skoků mezi cíli.
