@@ -31,6 +31,35 @@ Výrazy a reakce drží renderer (ne dokument), u soupeře se odvodí z přehrá
 - vyřazení: postavička s kroužky v očích odlétne v oblouku a „puf“ (obláček a hvězdičky), nikdy nic krutého.
 `prefers-reduced-motion`: výrazy zůstávají, mizí třes, poskoky, zploštění, mrkání, hvězdičky se netočí, méně úlomků a částic, žádné zpomalení ani hit-stop.
 
+## Jednotky v2 (art.js, obě tělesné šablony: křeček i sovička)
+Každá jednotka má vlastní siluetu, aby se nepletla ani ve 24 px na telefonu. Všechny vychází ze strážníka (křeček r 19,5), barva týmu zůstává, rozdíl dělá tvar a doplněk.
+- **Král** (r 24): o čtvrtinu větší než strážník, zlatá koruna se třemi hroty (stejná i v HUD jako ikona), pláštěnka v barvě týmu se zvlněným červeným lemem. Lišta životů nad hlavou stále, v HUD lišta krále u obou hráčů.
+- **Strážník** (r 19): základní postavička z v1, beze změny.
+- **Tlusťoch** (r 30): široká koule, bříško přes většinu těla, malé uši a hlava; sovička je načepýřená koule z peříček. Při odrazu ježka tyrkysový kroužek a nápis „boing“.
+- **Štítonoš** (obdélník 30×50): přilba s čelním pásem s nýty a týmovým hřebenem, kulatý štít z dřeva s kovovým okrajem a týmovým pupkem před tělem. Štít praská ve třech stupních (prasklý, ulomený okraj, jen úlomek) podle zbývajícího štítu.
+- **Skokan** (r 14): drobný, výš posazené tělo, pásek přes čelo; při úskoku se protáhne a „hop!“ bublina.
+- **Léčitel** (r 18): bílá čepice se zeleným křížem a brašna přes rameno; při léčení zelené „+6“ a zelená aura.
+Ostatní jednotky ukazují lištu životů jen při zranění. V HUD má každá jednotka pastilku s kroužkem životů, štít jako modrý oblouk.
+
+## Ježci a nové materiály v2
+- **Špičák:** malý, žlutý, dlouhé ocelové hroty a špičatý čumák (silueta „šípek“), aby se nepletl s kulatými ježky.
+- **Led:** mléčně světle modrý, fasetované plochy, mrazivé tečky a šestiramenné vločky. **Kov:** široké zkosení, rýhy broušení, nýty v rozích, ostrý lesk.
+
+## Mapy (terén mezi pevnostmi, vždy symetrický, podstavce a praky stejné)
+- **Kopec:** zelený kopec uprostřed zastaví nízké rány (výchozí mapa v1).
+- **Údolí s jezírkem:** šikmé hliněné břehy a jezírko, které spolkne, co do něj spadne; tráva jen na rovině.
+- **Plošiny:** tři dřevěné plošiny na sloupcích (prkna), chytí nízké rány, střílí se obloukem nebo mezerou.
+- **Skála:** fialově šedá skála s mechem uprostřed, přes ni jen vysoký oblouk.
+Paleta map vychází z jedné „Ranní louky“ (jen jemné posuny nebe a trávy, `PAL` v `game.js`), aby každá mapa byla jiná, ale svět zůstal jeden.
+
+## Modifikátory (karta partie, štítek `#modChip` v HUD)
+- **Klidný den:** bez úprav.
+- **Vítr 1–3:** bílé proužky ve směru větru (pás pod horním HUD zůstává čistý) a **praporek větru** za prakem každého hráče: vlaje po větru, síla = počet oranžových pruhů ze tří (zbytek papírově bílý) a jak vodorovně stojí (síla 1 visí, 3 stojí rovně). Při `prefers-reduced-motion` praporek nevlaje, jen ukazuje směr a sílu.
+- **Noc:** tmavě modré nebe, hvězdy, teplé světlo luceren za pevnostmi a světlušky; jednotky a kostky zůstávají plně čitelné (noc jen v pozadí a terénu).
+- **Mráz:** chladnější tráva a kopce, v pevnostech víc ledu.
+- **Lehká gravitace:** stoupající chmýří v pozadí.
+Odveta má vždy jinou mapu a jiný modifikátor než předchozí partie.
+
 ## Kostky a ježci
 Kostky mají jednotný jazyk: světlo nahoře vlevo, stín dole vpravo, vnitřní hrana; dřevo má suky, léta a hřebíky, kámen fazetu a tečky, sklo odlesky. Praskliny přibývají ve čtyřech stupních podle hp/max (dvojitý tah, tmavý + světlý okraj pro hloubku). Zničená kostka se rozpadne na úlomky stejného materiálu (dřevěné třísky, kamenné kusy, skleněné střepy), které padají, odskakují a mizí.
 Ježci se liší siluetou i barvou: obyčejný hnědý, kamenný šedý s hrubšími hroty, gumový tyrkysový s oblými hroty, bouchací červený s doutnákem.

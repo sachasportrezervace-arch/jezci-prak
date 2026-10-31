@@ -708,22 +708,46 @@ const ghostRect = p => p.evaluate(() => {
   await hideBanner(C);
   check("přihlížející vidí stejnou mapu, modifikátor, tituly a skóre jako hráči", ic.sd === ra.sd && ic.md === ra.md && eq(ic.w, ra.w) && (await C.locator("#score").innerText()).replace(/\s/g, "") === sc.replace(/\s/g, ""));
   {
-    // kamera při výstřelu jen skočí (prak střelce → pevnost cíle), neplyne
-    const P = startP === "x" ? A : B;
-    const xs = [];
+    // reduced motion na výšku (camera.js shotGoal): kamera ježka nesleduje. Záběry: prak střelce → jeden pevný záběr letu,
+    // ve kterém je prak i cílová pevnost (ježek v něm letí přes obrazovku) → cílová pevnost; mezi nimi krátké přechody (~0,18 s).
+    // Vzorkuje se celé přehrávání (přihlížející hraje rychlostí 1, let i doznívání trvá několik sekund) a chvíli po něm.
+    const P = startP === "x" ? A : B, tg = other(startP);
+    const ss = [];
     const shot3 = shoot(P, startP === "x" ? B : A, "odveta: první výstřel", {
       during: async () => {
         const seen = await C.waitForFunction(() => window.JPT.info().replay, null, { timeout: 60000, polling: 40 }).then(() => true, () => false);
-        for (let i = 0; i < 70 && seen; i++) { xs.push((await camOf(C)).x); await C.waitForTimeout(50); }
-        // záběry: prak → jeden pevný záběr letu (prak až cílová pevnost) → cílová pevnost; mezi nimi jen krátké přechody
-        const lo = Math.min(...xs), hi = Math.max(...xs);
-        let run = 0, longest = 0, still = 0, plateaus = 0;
-        for (let k = 1; k < xs.length; k++) {
-          if (Math.abs(xs[k] - xs[k - 1]) > 1.5) { longest = Math.max(longest, ++run); if (still >= 4) plateaus++; still = 0; }
-          else { run = 0; still++; }
+        const t0 = Date.now();
+        for (let after = 0; seen && after < 25 && Date.now() - t0 < 40000;) {
+          const s = await C.evaluate(([me, tg]) => {
+            const c = window.JPT.cam(), h = window.JPT.hogScreen(), sl = window.JPT.proj(JP.SLING[me].x, JP.SLING[me].y);
+            const z = JP.ZONE[tg], fl = window.JPT.proj(z[0], JP.GY)[0], fr = window.JPT.proj(z[1], JP.GY)[0], vw = innerWidth;
+            return { x: c.x, hx: h ? h[0] : null, rp: window.JPT.info().replay, homeX: c.home.x, both: sl[0] >= 0 && sl[0] <= vw && (fl + fr) / 2 >= 0 && (fl + fr) / 2 <= vw, whole: fl >= -2 && fr <= vw + 2, vw };
+          }, [startP, tg]);
+          s.t = Date.now() - t0; ss.push(s);
+          if (!s.rp) after++;
+          await C.waitForTimeout(50);
         }
-        if (still >= 4) plateaus++;
-        check("prefers-reduced-motion: kamera při výstřelu nesleduje ježka, jen pár pevných záběrů s krátkými přechody (prak → let → cíl)", seen && hi - lo > 300 && plateaus >= 2 && plateaus <= 4 && longest <= 14, `rozsah ${Math.round(hi - lo)}, nejdelší přechod ${longest * 50} ms, ${plateaus} poloh`);
+        const xs = ss.map(s => s.x), lo = Math.min(...xs), hi = Math.max(...xs);
+        // polohy = úseky, kde se střed kamery nehne o víc než 1,5 px aspoň 4 vzorky; přechod = souvislý pohyb (měřeno v ms)
+        const plat = []; let run0 = -1, longest = 0, cur = null;
+        for (let k = 1; k < ss.length; k++) {
+          if (Math.abs(xs[k] - xs[k - 1]) > 1.5) { if (run0 < 0) run0 = ss[k - 1].t; longest = Math.max(longest, ss[k].t - run0); cur = null; }
+          else { run0 = -1; if (!cur) plat.push(cur = { a: k - 1, b: k }); else cur.b = k; }
+        }
+        const pls = plat.filter(p => p.b - p.a >= 4);
+        // záběr letu = poloha, ve které ježek letí nejvíc vzorků
+        const fly = s => s.hx != null && s.rp, inP = p => ss.slice(p.a, p.b + 1);
+        const flyP = pls.map(p => ({ p, n: inP(p).filter(fly).length })).sort((u, v) => v.n - u.n)[0];
+        const fS = flyP ? inP(flyP.p).filter(fly) : [], hxs = fS.map(s => s.hx), vw = ss.length ? ss[0].vw : 1;
+        const hogTravel = hxs.length ? Math.max(...hxs) - Math.min(...hxs) : 0;
+        const last = ss[ss.length - 1] || {};
+        check("prefers-reduced-motion: kamera při výstřelu nesleduje ježka, jen 2–4 pevné záběry (prak → let → cíl) s krátkými přechody",
+          seen && pls.length >= 2 && pls.length <= 4 && longest <= 900 && hi - lo > 200,
+          `${pls.length} poloh (${pls.map(p => Math.round(xs[p.a])).join(" → ")}), nejdelší přechod ${longest} ms, rozsah ${Math.round(hi - lo)}, ${ss.length} vzorků za ${last.t} ms`);
+        check("prefers-reduced-motion: záběr letu je pevný a obsáhne prak střelce i cílovou pevnost, ježek jím přeletí (kamera se za ním nehýbe)",
+          !!flyP && flyP.n >= 4 && fS.every(s => s.both) && hogTravel > 0.3 * vw,
+          flyP ? `záběr x ${Math.round(xs[flyP.p.a])}, ${flyP.n} vzorků letu, prak i pevnost v záběru ${fS.filter(s => s.both).length}/${fS.length} (celá pevnost ${fS.filter(s => s.whole).length}), ježek přeletěl ${Math.round(hogTravel)} px z ${vw}` : "žádný záběr letu");
+        check("prefers-reduced-motion: po výstřelu kamera stojí na výchozím pohledu (pevnost hráče na tahu)", !last.rp && Math.abs(last.x - last.homeX) < 12, `x ${Math.round(last.x)}, výchozí ${Math.round(last.homeX)}`);
       },
     });
     await shot3;

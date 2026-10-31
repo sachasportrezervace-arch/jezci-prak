@@ -201,3 +201,17 @@ Soubory: `engine.js` (kódy, materiály, jednotky, simulace), nový `fort.js`, `
 10. **Nasazení:** bump `?v=`, zapsat do `docs/worklog.md`, README (pravidla) a DESIGN.md (jednotky, ježek `s`).
 
 **Rizika (pořadí podle závažnosti):** (1) nestabilní pevnosti → mitigace kontroly + záložní šablona; (2) objem kf s 80+ tělesy → `every 3`, strop 24 kB, test; (3) výkon mobilu při 90 tělesech (Matter spí; měřit snímkovou frekvenci na iPhonu 13); (4) rozbitá deterministika Skokana/Tlusťocha při opakované simulaci (testovat stejný vstup → shodný výstup); (5) souběžné zápisy: ruka `hd` a zásoba `bs` musí být v podmínce `commit`; (6) kamera mění souřadnice scény, kterou čtu: společně přes `JP` konstanty.
+
+## 11. Změněná čísla po playtestu (31. 10. 2026, nasazeno)
+Proč: v prvním playtestu v2 (bot s lidskou chybou ±4°/±6 %) padal král 1.–2. ranou (strop zásahu platil na každý náraz zvlášť a dotek země krále vyřadil). Po zvednutí krále na 80 HP a 9 tazích zase všechny partie končily jen limitem (5,4–9,0 min). Hodnoty níže jsou kompromis, který dal 3 partie po 4,0–4,9 min, 2 ze 3 skončily pádem krále, comeback ve všech třech.
+
+| co | návrh (sekce 1–9) | nasazeno | kde |
+|---|---|---|---|
+| život krále | 60 | **70** | `UNIT.K.hp` |
+| strop zásahů krále | – (za každý náraz) | **30 za celou akci** (`TUNE.kingCap 0.43` × 70) | `engine.js`, `damage()` |
+| král dotkne země | vyřazení | **−35 životů**, jednou za akci, král na zemi už znovu neztrácí | `KING_FALL` |
+| limit tahů | 9 každého | **8 každého** (`n ≥ 16`) | `RULES.turns` |
+| poškození nárazem | `TUNE.dmg 0.15` | 0,42 (z ladění před playtestem, beze změny) | `TUNE.dmg` |
+| comeback | – | král o 35 % slabší nebo o 2 jednotky méně → jednou za partii stavba navíc, smí stavět hned | `RULES.comebackKing/Units` |
+
+Texty v `#intro`, `#helpSheet` a na konci hry odpovídají těmto číslům. Měření: `docs/worklog.md` (tabulka playtestu), `node tests/tune.cjs` (král jednou ranou 0 %).
