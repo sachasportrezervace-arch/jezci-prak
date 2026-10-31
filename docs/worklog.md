@@ -2,6 +2,14 @@
 
 PŘEVZATO 31. 10. – dodělává session na účtu P, jiná session sem nepíše.
 
+## 2026-10-31 · Claude (v2 nasazena)
+- Hotovo: v2 je živě na https://sachasportrezervace-arch.github.io/jezci-prak/ (trénink `#solo`), commit 79c1c00 (push 252494f..79c1c00, Pages za ~47 s, ověřeno node skriptem: nasazený `index.html`, `engine.js`, `camera.js` = lokální). README (pravidla v2), DESIGN.md (jednotky, mapy, modifikátory, praporek větru), `docs/herni-design-v2.md` sekce 11 (změněná čísla s důvodem), `?v=23`.
+- FAIL (b) byl test, ne kamera: v reduced motion na výšku je záměrně jeden pevný záběr letu (prak + cílová pevnost), simulace `camera.js` v Node: prak 261 → let 870 → cíl 1139, přechody ~0,4 s. Starý test vzorkoval jen ~5 s od začátku přehrávání, přihlížející ale přehrává rychlostí 1 (7,7–8,2 s), takže viděl jen záběr letu. Test teď vzorkuje celé přehrávání a ověřuje 3 věci: 2–4 pevné polohy s přechody ≤ 900 ms, záběr letu obsahuje prak i celou cílovou pevnost a ježek jím přeletí (kamera ho nesleduje), po výstřelu výchozí pohled. Kamera beze změny, engine beze změny.
+- Ověřeno lokálně (8823): `node tests/duel.cjs http://127.0.0.1:8823/` 135 PASS 0 FAIL exit 0, `node tests/solo.cjs http://127.0.0.1:8823/` 25 PASS exit 0, `node tests/tune.cjs` exit 0 (390/390, král jednou ranou 0 %), `node tests/gen.cjs` exit 0.
+- Ověřeno živě: `SHOTS=tests/shots-live node tests/duel.cjs https://sachasportrezervace-arch.github.io/jezci-prak/` 135 PASS 0 FAIL exit 0 (reduced motion: 2 polohy, přechod 636 ms, celá pevnost v záběru letu 52/52), `node tests/solo.cjs https://sachasportrezervace-arch.github.io/jezci-prak/` 25 PASS 0 FAIL exit 0.
+- Rozhodnuto: `?v=23` (v souboru už bylo 22, ne 20). Screenshoty `tests/shots-solo` jsou z živého běhu.
+- Otevřené: NEOVĚŘENO „Tlusťoch odrazil ježka“ v partii (duel to nevynutí, pokrývá `tune.cjs`); reálný playtest Marka a Radky na telefonech (bot je přesnější než člověk, partie budou spíš delší); server 8823 běží dál (PID v `%TEMP%\jezci-8823.pid`, nespouštěla ho tato session).
+
 ## 2026-10-31 · Claude (převzetí v2: předávka k nasazení)
 - Hotovo: HUD v2, opravy po design-eye (3 kola, kolo 3 verdikt „profesionální indie hra: ANO“), sólo režim „Zkusit sám“ / `#solo` (`tests/solo.cjs`), nový `tests/duel.cjs` v2 a `tests/playtest.cjs` (3 partie přes odvetu).
 - Vyvážení (engine.js): král 70 HP; zásahy krále mají strop 30 **za celou akci** (`kingCap 0.43`, dřív za každý náraz → král padal 1.–2. ranou); dotek země krále nevyřadí, vezme 35 (`KING_FALL`, jednou za akci, král ležící na zemi už znovu neztrácí); limit 8 tahů každého (`RULES.turns 8`). Texty v #intro, #helpSheet a na konci upravené.
