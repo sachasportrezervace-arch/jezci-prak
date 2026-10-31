@@ -26,7 +26,18 @@
     wP: { m: "w", w: 130, h: 22 }, wL: { m: "w", w: 230, h: 22 }, wB: { m: "w", w: 22, h: 96 },
     sB: { m: "s", w: 46, h: 46 }, gP: { m: "g", w: 20, h: 96 }, gS: { m: "g", w: 96, h: 18 },
   };
-  const CRITTER_HP = 22;
+  const CRITTER_HP = 30;
+  // druhy ježků (twist: příští ježek je ten, kterého ti vybral soupeř)
+  //   r poloměr, d hustota, rest odrazivost, v násobek rychlosti, boom = vybuchne při prvním nárazu
+  const HOGS = {
+    n: { r: 17, d: 0.004, rest: 0.3, v: 1 },
+    k: { r: 19, d: 0.0095, rest: 0.06, v: 0.84 },
+    g: { r: 17, d: 0.0026, rest: 0.9, v: 1 },
+    b: { r: 17, d: 0.004, rest: 0.2, v: 1, boom: true },
+  };
+  const HOG_ORDER = "nkgb";
+  const hogOf = t => HOGS[t] || HOGS.n;
+  const BOOM_R = 150;
   // kostky, které si střelec může přidat ve fázi stavby
   const BUILD = ["wP", "sB", "gP"];
 
@@ -107,10 +118,17 @@
     let every = opt.every || 2;
     const emit = e => { ev.push(e); if (opt.onEvent) opt.onEvent(e); };
 
+    const pendingD = new Map(), dCount = new Map();
+    let hogType = "n", boomAt = null, launchTick = 0;
     function damage(id, amount, x, y) {
       const it = items.get(id);
       if (!it || doomed.has(id)) return;
       it.hp -= amount;
+      // události „d“: postavičky při každém ztraceném bodu, kostky jen při přechodu na další čtvrtinu (praskliny u soupeře při přehrávání)
+      if (it.hp > 0 && amount >= 1) {
+        if (it.k === "C") pendingD.set(id, it.hp);
+        else { const q = Math.floor(it.hp / it.max * 4); if (q !== it.q) { it.q = q; pendingD.set(id, it.hp); } }
+      }
       if (it.hp <= 0) { doomed.add(id); emit({ type: it.k === "C" ? "k" : "b", id, t: tick, x: r1(x), y: r1(y), m: it.k === "C" ? it.t : KIND[it.k].m }); }
     }
     Events.on(engine, "collisionStart", e => {
@@ -123,6 +141,7 @@
           if (X.label === "C" && Y.label === "ground") damage(X.plugin.id, 999, X.position.x, X.position.y);
         }
         if (v < 1.6) continue;
+        if (hog && hogOf(hogType).boom && !boomAt && tick > launchTick + 3 && (A === hog || B === hog)) boomAt = { x: sp.x, y: sp.y };
         for (const [X, Y] of [[A, B], [B, A]]) {
           const id = X.plugin.id;
           if (!id) continue;
@@ -150,11 +169,35 @@
     }
     for (const [id, it] of items) { const b = it.b; last.set(id, [Math.round(b.position.x), Math.round(b.position.y), Math.round(b.angle * 100)]); }
 
+    // výbuch bouchacího ježka: odhodí a poškodí vše v okruhu BOOM_R, ježek zmizí
+    function explode(cx, cy) {
+      boomAt = null;
+      emit({ type: "e", t: tick, x: r1(cx), y: r1(cy), r: BOOM_R });
+      for (const [id, it] of items) {
+        const b = it.b, dx = b.position.x - cx, dy = b.position.y - cy, d = Math.hypot(dx, dy);
+        if (d >= BOOM_R) continue;
+        const k = 1 - d / BOOM_R, m = b.mass, nx = dx / (d || 1), ny = dy / (d || 1) - 0.35;
+        const dv = Math.min(15, 21 * k / m);
+        Sleeping.set(b, false);
+        Body.setVelocity(b, { x: b.velocity.x + nx * dv, y: b.velocity.y + ny * dv });
+        damage(id, (it.k === "C" ? 26 : 34) * k, b.position.x, b.position.y);
+      }
+      if (hog) { emit({ type: "x", t: tick, x: r1(cx), y: r1(cy) }); Composite.remove(engine.world, hog); hog = null; }
+      wakeAll();
+    }
     function wakeAll() { for (const it of items.values()) Sleeping.set(it.b, false); }
     function step() {
       if (done) return false;
       Engine.update(engine, 1000 / 60);
       tick++;
+      if (boomAt && hog) explode(boomAt.x, boomAt.y);
+      if (pendingD.size) {
+        for (const [id, hp] of pendingD) {
+          const n = dCount.get(id) || 0;
+          if (items.has(id) && !doomed.has(id) && n < 8) { dCount.set(id, n + 1); emit({ type: "d", id, t: tick, hp: Math.round(hp) }); }
+        }
+        pendingD.clear();
+      }
       if (doomed.size) {
         for (const id of doomed) { const it = items.get(id); if (it) { Composite.remove(engine.world, it.b); items.delete(id); } }
         doomed.clear(); wakeAll();
@@ -170,7 +213,9 @@
       if (hog) {
         const p = hog.position;
         hogIdle = hog.speed < 0.6 ? hogIdle + 1 : 0;
-        if (p.x < -200 || p.x > W + 200 || p.y > GY + 300 || hogIdle > 50 || tick > limit - 30) {
+        const gone = p.x < -200 || p.x > W + 200 || p.y > GY + 300;
+        if (!gone && hogOf(hogType).boom && (hogIdle > 40 || tick > launchTick + 240)) explode(p.x, p.y);
+        else if (gone || hogIdle > 50 || tick > limit - 30) {
           emit({ type: "x", t: tick, x: r1(p.x), y: r1(p.y) });
           Composite.remove(engine.world, hog); hog = null;
         }
@@ -189,11 +234,12 @@
     return {
       engine, items,
       get hog() { return hog; }, get tick() { return tick; }, get done() { return done; },
-      launch(team, ang, pow) {
-        const s = SLING[team];
-        hog = Bodies.circle(s.x, s.y, HOG_R, { density: 0.004, friction: 0.5, restitution: 0.3, frictionAir: 0, label: "hog" });
+      launch(team, ang, pow, type) {
+        const s = SLING[team], H = hogOf(type);
+        hogType = HOGS[type] ? type : "n"; launchTick = tick;
+        hog = Bodies.circle(s.x, s.y, H.r, { density: H.d, friction: 0.5, restitution: H.rest, frictionAir: 0, label: "hog" });
         Composite.add(engine.world, hog);
-        Body.setVelocity(hog, launchVel(ang, pow));
+        Body.setVelocity(hog, launchVel(ang, pow, hogType));
         Body.setAngularVelocity(hog, team === "x" ? 0.25 : -0.25);
         record(true);
       },
@@ -240,10 +286,10 @@
     return Math.max(80, top - h / 2 - 14);
   }
 
-  const launchVel = (ang, pow) => ({ x: Math.cos(ang) * pow * VMAX, y: Math.sin(ang) * pow * VMAX });
+  const launchVel = (ang, pow, type) => { const k = pow * VMAX * hogOf(type).v; return { x: Math.cos(ang) * k, y: Math.sin(ang) * k }; };
   // náhled začátku dráhy (bez srážek)
-  function preview(team, ang, pow, n = 34, every = 2) {
-    const s = SLING[team], v = launchVel(ang, pow), pts = [];
+  function preview(team, ang, pow, n = 34, every = 2, type) {
+    const s = SLING[team], v = launchVel(ang, pow, type), pts = [];
     let x = s.x, y = s.y, vx = v.x, vy = v.y;
     for (let i = 1; i <= n * every; i++) { vy += G; x += vx; y += vy; if (i % every === 0) pts.push([x, y]); }
     return pts;
@@ -277,6 +323,8 @@
       if (e.type === "o") return ["o", e.id, e.t].join(".");
       if (e.type === "x") return ["x", e.t, Math.round(e.x), Math.round(e.y)].join(".");
       if (e.type === "n") return ["n", e.id, e.t, e.k, Math.round(e.x), Math.round(e.y), e.a].join(".");
+      if (e.type === "d") return ["d", e.id, e.t, e.hp].join(".");
+      if (e.type === "e") return ["e", e.t, Math.round(e.x), Math.round(e.y), e.r].join(".");
       return "";
     }).filter(Boolean).join("|");
   }
@@ -290,6 +338,8 @@
         case "o": return { type: "o", id: n(1), t: n(2) };
         case "x": return { type: "x", t: n(1), x: n(2), y: n(3) };
         case "n": return { type: "n", id: n(1), t: n(2), k: f[3], x: n(4), y: n(5), a: n(6) };
+        case "d": return { type: "d", id: n(1), t: n(2), hp: n(3) };
+        case "e": return { type: "e", t: n(1), x: n(2), y: n(3), r: n(4) };
       }
       return null;
     }).filter(e => e && Number.isFinite(e.t)).sort((a, b) => a.t - b.t);
@@ -313,6 +363,9 @@
       m.track.push([t, x, y, a]);
     }
     for (const e of events) if ((e.type === "b" || e.type === "k" || e.type === "o") && map.has(e.id)) map.get(e.id).gone = e.t;
+    const dmgEv = new Map();      // id -> [[tick, hp]]
+    for (const e of events) if (e.type === "d") { if (!dmgEv.has(e.id)) dmgEv.set(e.id, []); dmgEv.get(e.id).push([e.t, e.hp]); }
+    const hpAt = (id, t, hp0) => { const l = dmgEv.get(id); if (!l) return hp0; let hp = hp0; for (const [tt, h] of l) if (tt <= t) hp = h; else break; return hp; };
     const xEv = events.find(e => e.type === "x");
     const hogGone = xEv ? xEv.t : (hogTrack.length ? hogTrack[hogTrack.length - 1][0] + 1 : 0);
     const end = Math.max(0, ...frames.map(f => f[0]), ...events.map(e => e.t));
@@ -333,7 +386,7 @@
         for (const [id, m] of map) {
           if (t >= m.gone || (m.born !== undefined && t < m.born)) continue;
           const p = at(m.track, t);
-          if (p) out.push({ id, k: m.k, t: m.t, x: p[1], y: p[2], a: p[3] / 100, hp: m.hp, max: m.k === "C" ? CRITTER_HP : MAT[KIND[m.k].m].hp });
+          if (p) out.push({ id, k: m.k, t: m.t, x: p[1], y: p[2], a: p[3] / 100, hp: hpAt(id, t, m.hp), max: m.k === "C" ? CRITTER_HP : MAT[KIND[m.k].m].hp });
         }
         return out;
       },
@@ -346,7 +399,7 @@
   }
 
   const JP = {
-    W, GY, PY, G, VMAX, HOG_R, CR, SLING, ZONE, PLINTHS, HILL, KIND, MAT, BUILD, CRITTER_HP, MAX_TICKS,
+    W, GY, PY, G, VMAX, HOG_R, CR, SLING, ZONE, PLINTHS, HILL, KIND, MAT, BUILD, CRITTER_HP, MAX_TICKS, HOGS, HOG_ORDER, BOOM_R, hogOf,
     initialBodies, packBodies, unpackBodies, alive, dims, sim, preview, launchVel, decFrames, decEvents, replay,
   };
   if (typeof module !== "undefined") module.exports = JP;

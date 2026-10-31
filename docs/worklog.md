@@ -1,5 +1,13 @@
 # Deník – Ježkomet (jezci-prak)
 
+## 2026-10-31 · Claude (kolo 4: pocit ze hry, postavičky, nový twist)
+- Hotovo: nové postavičky po vrstvách (art.js), reakce (strach, zásah, zranění, radost, facepalm, vyřazení), úlomky kostek, hit-stop a zpomalení u rozhodujícího zásahu, jednotné kostky s prasklinami, klidná scéna, guma praku. Twist „ježci od soupeře“ (obyčejný, kamenný, gumový, bouchací; soupeř vybírá, dávky) místo stavění kostek; v dokumentu `hg`, `pl`, `h[].ht`, staré hry se načtou s výchozími hodnotami.
+- Změřeno před změnou: stavění kostek 4,5 až 13,9 s a ~22 % náhodných kostek zabilo vlastní postavičku; čekání soupeře na tah průměrně 9,9 s (let 3,9 s, stavba 6,7 s). Po změně (střelec simuluje celý výstřel hned, odešle ho a svůj tah si přehraje ze stejných snímků, rychlejší dotazování, zrychlené doznívání): čekání průměrně 7,8 s, výběr ježka 4,4 s.
+- CRITTER_HP 22 → 30. Délka partie podle sim: bot-lidský hráč s chybou 3,4 výstřelu na hráče (dřív 2,9), nahodilý hráč 8,5 (dřív 7,0); skutečná partie bude mezi tím. `tests/tune.cjs`: kamenný ježek občas složí všechny tři (6 ze 120 mřížkových výstřelů), ostatní žádný.
+- Design review (design-eye): kolo 1 NE (obří ikona kopírování, systémový font ve zprávě, panel zakrývá pevnosti, prak bez gumy, přetékající karty na šířku), kolo 2 NE (panel a konec hry zakrývaly pevnosti na výšku, karty na šířku přetékaly), kolo 3 ANO. Opraveno: ikony v tlačítkách, font polí, guma praku, náhled dráhy končí v terénu, panel výběru dole mezi pevnostmi (desktop, na šířku) a v nebi (na výšku), konec hry mimo scénu, kompaktní karty na šířku, nabídka s nadpisem a odlišeným „Vzdát partii“, dialogy s max. výškou.
+- Test: `node tests/duel.cjs` 37 kontrol (twist v 1. kole, výběr ježka, reakce, úlomky, zpomalení). `tests/renders.cjs` vyrobí sadu všech obrazovek (tests/shots-review), `tests/gif.cjs` GIF reakcí (tests/shots-live/reakce.gif).
+- Otevřené: na výšku je scéna malá (celý záběr na šířku telefonu) a pod ní hlína; chce kameru zaostřenou na vlastní prak nebo výzvu k otočení. Pole se zprávou ve sdílení ořezává poslední řádek. Načítací karta bez animace. Hra nečeká na soupeře před jeho přijetím výzvy (zakladatel může střílet hned).
+
 ## 2026-10-31 · Claude (session z Psaníčka)
 - Hotovo: hra postavená a nasazená, https://sachasportrezervace-arch.github.io/jezci-prak/ (repo sachasportrezervace-arch/jezci-prak, Pages z main /).
 - Název „Ježkomet“ (ježek + -met), složka a repo zůstávají `jezci-prak` podle zadání. Svět a twisty v DESIGN.md, produkt v PRODUCT.md (odvozeno ze zadání, bez rozhovoru – Mark nechce dotazy).

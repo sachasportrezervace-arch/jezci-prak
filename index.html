@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Ježkomet</title>
 <meta name="description" content="Tahová prakovačka pro dva na jednom odkazu: střílej ježka na soupeřovu pevnost a shoď jeho tři postavičky.">
-<meta name="theme-color" content="#7FD6F2">
+<meta name="theme-color" content="#86D9F2">
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -22,7 +22,7 @@
   @font-face { font-family: "Titan One"; src: url(fonts/titan-one.woff2) format("woff2"); font-weight: 400; font-display: swap; }
   :root {
     --ink: #2B1638; --ink-2: #5B4568; --paper: #FFF8EA; --paper-2: #FBEBCB;
-    --sky: #7FD6F2; --sky-2: #FFF1C4; --grass: #6CCB3A; --lime: #C6F432;
+    --sky: #86D9F2; --grass: #6CCB3A; --lime: #C6F432;
     --ham: #FF7A2F; --ham-d: #D9541A; --owl: #9B6BFF; --owl-d: #7346D9;
     --red: #E8413C; --wood: #E9A55A; --stone: #A8B3C4; --glass: #BDEFFF;
     --r: 22px; --lip: 5px;
@@ -39,7 +39,7 @@
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
   #stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: default; }
-  #stage.aim { cursor: grab; } #stage.aiming { cursor: grabbing; } #stage.build { cursor: ew-resize; }
+  #stage.aim { cursor: grab; } #stage.aiming { cursor: grabbing; }
 
   /* ---------- tlačítka jako hračky ---------- */
   .btn { --c: var(--lime); --cd: #8DB51C; appearance: none; border: 3px solid var(--ink); border-radius: 18px; background: var(--c);
@@ -50,17 +50,19 @@
   .btn:active, .btn[aria-pressed="true"].tog { transform: translateY(3px); box-shadow: inset 0 -2px 0 var(--cd), 0 3px 8px -4px rgba(43, 22, 56, .5); }
   .btn:disabled { filter: saturate(.3) brightness(.95); cursor: progress; }
   .btn.paper { --c: var(--paper); --cd: #E6D3AE; }
+  .btn.danger { --c: #FFE0D8; --cd: #EBB0A3; color: #8A2418; }
   .btn.ham { --c: var(--ham); --cd: var(--ham-d); color: #fff; }
   .btn.owl { --c: var(--owl); --cd: var(--owl-d); color: #fff; }
   .btn.small { min-height: 44px; font-size: 16px; padding: 6px 14px calc(6px + var(--lip)); border-radius: 15px; }
   .btn.wide { width: 100%; }
   .icon { width: 46px; height: 46px; min-height: 46px; padding: 0 0 var(--lip); border-radius: 15px; }
   .icon svg { width: 24px; height: 24px; }
+  .btn svg.i { width: 22px; height: 22px; flex: none; }
   svg.i { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 
   /* ---------- papírové karty (nastavení, výzva, sdílení) ---------- */
-  .layer { position: fixed; inset: 0; display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); overflow-y: auto; }
-  .card { width: min(460px, 100%); background: var(--paper); border: 3px solid var(--ink); border-radius: 28px; box-shadow: var(--shadow); padding: 22px 20px 24px; }
+  .layer { position: fixed; inset: 0; display: grid; justify-items: center; align-items: start; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); overflow-y: auto; }
+  .card { margin: auto; width: min(460px, 100%); background: var(--paper); border: 3px solid var(--ink); border-radius: 28px; box-shadow: var(--shadow); padding: 22px 20px 24px; }
   .logo { font-family: "Titan One", "Baloo 2", sans-serif; font-weight: 400; font-size: clamp(40px, 11vw, 56px); line-height: .95; margin: 0 0 16px; letter-spacing: .01em;
     color: var(--ham); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 5px 0 var(--ink); }
   .logo span { color: var(--owl); }
@@ -70,7 +72,7 @@
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .f { display: grid; gap: 4px; font-weight: 700; font-size: 15px; }
   .f small { font-weight: 500; color: var(--ink-2); }
-  .in { width: 100%; min-height: 50px; border: 3px solid var(--ink); border-radius: 15px; background: #fff; padding: 8px 12px; font-size: 17px; font-weight: 600; caret-color: var(--ham); }
+  .in { font-family: inherit; width: 100%; min-height: 50px; border: 3px solid var(--ink); border-radius: 15px; background: #fff; padding: 8px 12px; font-size: 17px; font-weight: 600; caret-color: var(--ham); }
   .in::placeholder { color: #8f7e95; font-weight: 500; }
   select.in { appearance: none; -webkit-appearance: none; padding-right: 44px; cursor: pointer;
     background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232B1638' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 14px center / 20px; }
@@ -116,28 +118,47 @@
     background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; padding: 10px 14px 12px; width: min(92vw, 380px); text-align: center; box-shadow: var(--shadow); }
   .waitbox p { margin: 0; font-weight: 700; text-wrap: balance; }
 
-  /* stavba */
-  .buildbox { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom)); width: min(96vw, 520px);
+  /* výběr ježka pro soupeře (twist) */
+  .pickbox { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom)); width: min(96vw, 560px);
     background: var(--paper); border: 3px solid var(--ink); border-radius: 22px; padding: 10px 10px 12px; box-shadow: var(--shadow); display: grid; gap: 8px; }
-  .buildbox h3 { margin: 0; font-size: 16px; font-weight: 800; text-align: center; }
-  .kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .droprow { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
-  #rotBtn[aria-pressed="true"] { --c: #FFE2B8; --cd: #E9B978; }
-  .kind { --c: #fff; --cd: #E6D3AE; flex-direction: column; gap: 0; padding: 4px 4px calc(4px + var(--lip)); min-height: 64px; font-size: 14px; }
+  .pickbox h3 { margin: 0; font-size: 17px; font-weight: 800; text-align: center; }
+  .pickbox .note { margin: 0; text-align: center; font-size: 13px; }
+  .kinds { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .kind { --c: #fff; --cd: #E6D3AE; flex-direction: column; justify-content: flex-start; gap: 1px; padding: 6px 4px calc(6px + var(--lip)); min-height: 112px; font-size: 14px; text-align: center; }
   .kind[aria-pressed="true"] { --c: var(--lime); --cd: #8DB51C; }
-  .kind canvas { width: 70px; height: 30px; }
-  .kind small { font-weight: 600; font-size: 12px; color: var(--ink-2); line-height: 1; }
+  .kind:disabled { --c: #EFE6D2; --cd: #DCCFB3; filter: none; opacity: .62; cursor: not-allowed; }
+  .kind img { width: 48px; height: 48px; display: block; }
+  .kind .kt { display: contents; }
+  .kind .kn { font-weight: 800; line-height: 1.1; }
+  .kind .ki { font-weight: 600; font-size: 12px; color: var(--ink-2); line-height: 1.15; text-wrap: balance; }
+  .kind[aria-pressed="true"] .ki { color: var(--ink); }
+  .hogchip { position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 106px); pointer-events: none; display: flex; align-items: center; gap: 8px;
+    background: var(--paper); border: 3px solid var(--ink); border-radius: 18px; padding: 3px 14px 3px 6px; box-shadow: 0 6px 14px -8px rgba(43, 22, 56, .6); max-width: min(92vw, 420px, calc(100vw - 150px)); }
+  .hogchip img { width: 40px; height: 40px; flex: none; display: block; }
+  .hogchip b { display: block; font-weight: 800; font-size: 16px; line-height: 1.1; }
+  .hogchip span { display: block; font-weight: 600; font-size: 13px; color: var(--ink-2); line-height: 1.15; text-wrap: balance; }
 
   /* konec */
   .end { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vw, 420px); text-align: center; }
   .end.go { animation: drop .55s cubic-bezier(.2, 1.4, .4, 1) both; }
   @keyframes drop { from { transform: translate(-50%, -90%) scale(.8); opacity: 0; } }
+  /* na výšku stojí konec hry a výběr ježka v nebi, ať nezakrývají pevnosti ani výsledek posledního výstřelu */
+  @keyframes dropB { from { transform: translate(-50%, 40px) scale(.9); opacity: 0; } }
+  @media (orientation: portrait) and (max-width: 600px) {
+    .pickbox { left: calc(50% - 34px); width: calc(100vw - 92px); top: 112px; bottom: auto; transform: translateX(-50%); padding: 10px 10px 12px; gap: 8px; }
+    .pickbox .note { display: none; } .pickbox h3 { font-size: 16px; }
+    .pickbox .kinds { grid-template-columns: 1fr 1fr; gap: 6px; }
+    .pickbox .kind { flex-direction: row; justify-content: flex-start; align-items: center; text-align: left; gap: 6px; min-height: 58px; padding: 4px 8px calc(4px + var(--lip)); font-size: 14px; }
+    .pickbox .kind .kt { display: grid; gap: 0; } .pickbox .kind .ki { font-size: 11px; } .pickbox .kind img { width: 34px; height: 34px; flex: none; }
+    .end { top: 120px; bottom: auto; left: calc(50% - 34px); width: min(calc(100vw - 92px), 420px); transform: translateX(-50%); }
+    .end.go { animation-name: dropB; }
+  }
   .end h2 { font-size: clamp(30px, 8vw, 40px); margin-bottom: 4px; }
   .end .series { font-family: "Titan One", sans-serif; font-size: 20px; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
   .end .stake { font-weight: 700; margin: 0 0 14px; text-wrap: balance; }
 
   /* listy */
-  dialog { border: 3px solid var(--ink); border-radius: 26px; background: var(--paper); color: var(--ink); padding: 20px; width: min(440px, calc(100vw - 24px)); box-shadow: var(--shadow); }
+  dialog { border: 3px solid var(--ink); border-radius: 26px; background: var(--paper); color: var(--ink); padding: 20px; width: min(440px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow-y: auto; box-shadow: var(--shadow); }
   dialog::backdrop { background: rgba(43, 22, 56, .45); }
   dialog ul { padding-left: 20px; margin: 8px 0 16px; } dialog li { margin: 6px 0; }
   .menu { display: grid; gap: 10px; }
@@ -145,14 +166,28 @@
     border-radius: 14px; padding: 8px 16px; font-weight: 700; max-width: 90vw; text-align: center; }
   @media (max-width: 420px) {
     .plate { gap: 5px; padding-right: 8px; } .plate.o { padding-left: 8px; } .plate .nm { font-size: 14px; } .lives { gap: 0; } .lives img { width: 19px; height: 19px; } .score { font-size: 18px; }
-    .kinds { gap: 6px; } .kind { font-size: 13px; padding-inline: 2px; } .kind canvas { width: 52px; height: 24px; }
+    .kinds { gap: 5px; } .kind { font-size: 13px; padding-inline: 2px; min-height: 118px; } .kind .ki { font-size: 11px; } .kind img { width: 42px; height: 42px; }
   }
   @media (max-height: 430px) and (orientation: landscape) {
     .status { top: calc(max(8px, env(safe-area-inset-top)) + 46px); font-size: 14px; padding: 1px 12px 2px; }
     .hint { display: none; }
+    .layer { padding-block: 10px; }
+    .card { width: min(560px, 100%); padding: 12px 18px 14px; border-radius: 22px; }
+    .card .cast { display: none; } .logo { font-size: 34px; margin-bottom: 6px; text-shadow: 0 3px 0 var(--ink); -webkit-text-stroke-width: 2.5px; } h2 { font-size: 22px; } .lead { margin-bottom: 8px; font-size: 15px; }
+    .stack { gap: 8px; } .in { min-height: 42px; } textarea.in { min-height: 0; height: 66px; }
+    #setup .lead { display: none; }
+    #setupForm { grid-template-columns: 1fr 1fr; align-items: end; }
+    #setupForm .row2, #setupForm #setupSubmit, #setupForm #customWrap { grid-column: 1 / -1; } .btn { min-height: 44px; font-size: 16px; padding-block: 6px calc(6px + var(--lip)); }
     .status.pulse { animation: none; }
-    .buildbox { width: min(62vw, 470px); left: auto; right: 70px; bottom: max(10px, env(safe-area-inset-bottom)); transform: none; padding: 6px 8px 8px; gap: 4px; }
-    .buildbox h3 { display: none; } .kind { min-height: 50px; } .droprow .btn { min-height: 44px; }
+    .end { top: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(42vw, 360px); padding: 8px 12px 10px; }
+    .end.go { animation-name: dropB; } .end h2 { font-size: 24px; } .end .series { font-size: 16px; margin: 2px 0; } .end .stake { margin-bottom: 6px; font-size: 14px; }
+    /* na šířku stojí výběr na prázdném kopci mezi pevnostmi, ať nezakrývá cíl ani výsledek výstřelu */
+    .pickbox { width: min(42vw, 360px); left: 50%; right: auto; bottom: max(8px, env(safe-area-inset-bottom)); transform: translateX(-50%); padding: 6px 8px 8px; gap: 4px; }
+    .pickbox h3, .pickbox .note { display: none; }
+    .kinds { grid-template-columns: 1fr 1fr; gap: 5px; }
+    .kind { flex-direction: row; justify-content: flex-start; align-items: center; gap: 6px; min-height: 46px; padding: 3px 8px calc(3px + var(--lip)); font-size: 14px; }
+    .kind .ki { display: none; } .kind img { width: 30px; height: 30px; flex: none; } .pickbox .btn { min-height: 44px; }
+    .hogchip { top: calc(max(8px, env(safe-area-inset-top)) + 80px); } .hogchip span { display: none; } .hogchip img { width: 32px; height: 32px; }
     .meter { bottom: max(10px, env(safe-area-inset-bottom)); }
   }
   @media (max-height: 430px) and (orientation: landscape) {
@@ -172,11 +207,15 @@
     .tools { top: auto; bottom: 20px; right: 24px; flex-direction: row; gap: 10px; }
     .tools .btn { width: auto; padding: 6px 14px calc(6px + var(--lip)); gap: 8px; font-size: 16px; }
     .tools .lbl { display: inline; }
-    .hint, .meter, .waitbox { bottom: 24px; left: 24px; transform: none; font-size: 17px; }
-    .hint { max-width: 380px; text-align: left; }
-    .buildbox { left: auto; right: 24px; top: 50%; bottom: auto; transform: translateY(-50%); width: 380px; padding: 14px; gap: 12px; }
-    .buildbox h3 { font-size: 18px; }
-    .kind { min-height: 80px; font-size: 16px; } .kind canvas { width: 76px; height: 32px; }
+    .hint, .meter, .waitbox { top: 96px; bottom: auto; left: 24px; transform: none; font-size: 17px; }
+    .hint { max-width: 330px; text-align: left; }
+    .pickbox { left: 50%; right: auto; top: auto; bottom: 84px; transform: translateX(-50%); width: 440px; padding: 12px 14px 14px; gap: 8px; }
+    .pickbox h3 { font-size: 18px; }
+    .pickbox .note { display: none; }
+    .kinds { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .kind { flex-direction: row; justify-content: flex-start; align-items: center; text-align: left; gap: 10px; min-height: 64px; padding: 6px 12px calc(6px + var(--lip)); font-size: 16px; }
+    .kind .kt { display: grid; gap: 1px; } .kind .ki { font-size: 12px; } .kind img { width: 44px; height: 44px; flex: none; }
+    .hogchip { top: 138px; }
     .end { width: 460px; }
     #stage.pan { cursor: move; }
   }
@@ -248,7 +287,7 @@
     <ul style="margin:0;padding-left:20px">
       <li>Chyť ježka v praku, táhni ho dozadu a pusť.</li>
       <li>Postavička vypadne, když spadne na zem nebo dostane pořádnou ránu.</li>
-      <li>Po každém výstřelu si přidáš jednu kostku do své pevnosti.</li>
+      <li>Ježka na další výstřel ti vybírá soupeř: obyčejného, kamenného, gumového nebo bouchacího, každého jednou za dávku.</li>
     </ul>
     <button class="btn wide" id="acceptBtn" type="button">Přijmout výzvu</button>
     <button class="btn paper small" id="introMine" type="button">Tohle je moje hra (jiný prohlížeč)</button>
@@ -275,13 +314,12 @@
     <div class="meter" id="meter" hidden></div>
   <div class="hint" id="hint" hidden></div>
   <div class="waitbox" id="waitBox" hidden><p id="waitText"></p><button class="btn small" id="waitCopy" type="button">Zkopírovat odkaz</button></div>
-  <div class="buildbox" id="buildBox" hidden>
-    <h3>Přidej si jednu kostku do pevnosti</h3>
-    <div class="kinds" id="kinds"></div>
-    <div class="droprow">
-      <button class="btn paper small" id="rotBtn" type="button" aria-pressed="false"><svg class="i" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></svg>Otočit</button>
-      <button class="btn" id="dropBtn" type="button">Pustit kostku</button>
-    </div>
+  <div class="hogchip" id="hogChip" hidden><img id="hcIcon" alt="" width="40" height="40"><div><b id="hcName"></b><span id="hcInfo"></span></div></div>
+  <div class="pickbox" id="pickBox" hidden>
+    <h3 id="pickTitle">Jakého ježka pošleš soupeři?</h3>
+    <div class="kinds" id="kinds" role="group" aria-label="Druh ježka pro soupeře"></div>
+    <p class="note" id="pickNote"></p>
+    <button class="btn" id="sendBtn" type="button">Poslat ježka</button>
   </div>
   <div class="tools">
     <button class="btn paper icon" id="soundBtn" type="button" aria-label="Zvuk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="soundWave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path id="soundOff" d="M17 9l5 6M22 9l-5 6" hidden/></svg><span class="lbl" id="soundLbl">Zvuk</span></button>
@@ -300,13 +338,14 @@
   </div>
 </div>
 
-<dialog id="menuSheet" aria-label="Nabídka">
+<dialog id="menuSheet" aria-labelledby="menuTitle">
+  <h2 id="menuTitle">Nabídka</h2>
   <div class="menu">
     <button class="btn paper" id="mCopy" type="button">Zkopírovat odkaz na hru</button>
     <button class="btn paper" id="mHelp" type="button">Jak se hraje</button>
-    <button class="btn paper" id="mResign" type="button">Vzdát partii</button>
+    <button class="btn danger" id="mResign" type="button">Vzdát partii</button>
     <button class="btn paper" id="mNew" type="button">Nová hra s někým jiným</button>
-    <button class="btn small" data-close type="button">Zavřít</button>
+    <button class="btn paper small" data-close type="button">Zavřít</button>
   </div>
 </dialog>
 <dialog id="a2hsSheet" aria-labelledby="a2hsTitle">
@@ -325,7 +364,7 @@
     <li><b>Výstřel:</b> chyť ježka v praku a táhni dozadu, tečky ukazují začátek dráhy. Pusť a ježek letí. Na klávesnici šipky a mezerník.</li>
     <li><b>Kamera:</b> tažením mimo prak posouváš scénu, dvěma prsty (nebo kolečkem myši) přibližuješ. Lupa ukáže celou scénu.</li>
     <li><b>Vyřazení:</b> postavička vypadne, když spadne na zem nebo ji trefí pořádná rána. Sklo praskne hned, dřevo vydrží víc, kámen nejvíc.</li>
-    <li><b>Stavba:</b> po každém výstřelu si přidáš jednu kostku do své pevnosti. Vyber druh, posuň ji a pusť.</li>
+    <li><b>Ježci:</b> po výstřelu vybereš ježka, kterého střílí soupeř. Obyčejný je poctivý, kamenný boří, gumový skáče, bouchací vybuchne; každý druh dostane jednou, než se dávka obnoví.</li>
     <li><b>Výhra:</b> kdo první shodí všechny tři soupeřovy postavičky. Pak odveta, skóre série se počítá.</li>
   </ul>
   <button class="btn wide" data-close type="button">Jasně</button>
@@ -334,6 +373,7 @@
 
 <script src="vendor/matter-0.19.0.min.js"></script>
 <script src="engine.js"></script>
+<script src="art.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

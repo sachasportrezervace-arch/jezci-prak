@@ -1,6 +1,8 @@
 // Celá partie ve 2 nezávislých prohlížečích: Chromium na desktopu (1366×820, myš) a WebKit s emulací iPhonu 13
 // (na výšku, od 2. tahu na šířku). Navíc kamera (posun, pinch, kolečko, celá scéna), fullscreen / „Přidat na plochu“,
 // rozvržení desktop vs. mobil, přihlížející s prefers-reduced-motion.
+// Twist „ježci od soupeře“: po výstřelu vybereš druh ježka pro soupeře (dávkování), u soupeře je vidět hned v 1. kole.
+// Reakce postaviček (radost / úlek / facepalm, strach při letu ježka), úlomky kostek, zpomalení u rozhodujícího zásahu.
 // node tests/duel.cjs [URL]   (výchozí http://127.0.0.1:8793/)
 // Výstřel = skutečné tažení myší od praku; úhel a sílu vybere JPT.best() (jen s ?test) z mřížky simulací.
 const path = require("path");
@@ -61,11 +63,12 @@ const other = p => p === "x" ? "o" : "x";
   const ca = await camOf(A), cb = await camOf(B);
   check("desktop: výchozí pohled = celá scéna", Math.abs(ca.s - ca.full) < 0.01, `s ${ca.s.toFixed(3)} / celá ${ca.full.toFixed(3)}`);
   const fortsIn = await B.evaluate(() => { const c = window.JPT.cam(); return [70, 1330].map(x => innerWidth / 2 + (x - c.x) * c.s); });
-  check("iPhone na výšku: v záběru obě pevnosti přes celou šířku", fortsIn[0] >= -2 && fortsIn[1] <= 392 && fortsIn[1] - fortsIn[0] > 340, fortsIn.map(v => v.toFixed(0)).join(" až "));
+  const critIn = await B.evaluate(() => { const c = window.JPT.cam(); return [160, 1240].map(x => innerWidth / 2 + (x - c.x) * c.s); });
+  check("iPhone na výšku: v záběru postavičky obou pevností přes celou šířku", critIn[0] >= 0 && critIn[1] <= 390 && critIn[1] - critIn[0] > 330, critIn.map(v => v.toFixed(0)).join(" až "));
   const lblVis = await A.locator("#viewLbl").isVisible(), lblB = await B.locator("#viewLbl").isVisible();
   const toolsA = await A.locator(".tools").boundingBox(), toolsB = await B.locator(".tools").boundingBox();
   check("desktop: nástroje s popisky v řadě dole, mobil: ikony ve sloupci nahoře", lblVis && !lblB && toolsA.width > toolsA.height && toolsA.y > 700 && toolsB.height > toolsB.width && toolsB.y < 120);
-  const hB = await B.$$eval(".tools .btn, #endPrimary, #dropBtn", els => els.filter(e => e.offsetParent).map(e => Math.round(e.getBoundingClientRect().height)));
+  const hB = await B.$$eval(".tools .btn, #endPrimary, #sendBtn, #kinds .btn", els => els.filter(e => e.offsetParent).map(e => Math.round(e.getBoundingClientRect().height)));
   check("mobil: dotykové cíle aspoň 44 px", hB.length >= 4 && hB.every(h => h >= 44), hB.join(","));
   const fsA = await A.evaluate(() => getComputedStyle(document.querySelector(".plate .nm")).fontSize), fsB = await B.evaluate(() => getComputedStyle(document.querySelector(".plate .nm")).fontSize);
   check("desktop má větší HUD než mobil (vlastní rozvržení)", parseFloat(fsA) > parseFloat(fsB), `${fsA} vs ${fsB}`);
@@ -116,7 +119,9 @@ const other = p => p === "x" ? "o" : "x";
 
   // 4) partie
   for (const p of [A, B]) await p.evaluate(() => { window.JPT.speed = 3; });
-  let turns = 0, sawReplay = false, sawBuild = false, syncOk = true, follow = null, landscape = false;
+  let turns = 0, sawReplay = false, sawPick = false, syncOk = true, follow = null, landscape = false, twistSeen = 0, usedTypes = new Set(["n"]), firstRound = null;
+  const NAMES = { n: "Obyčejný", k: "Kamenný", g: "Gumový", b: "Bouchací" };
+  const WANT = ["b", "k", "g", "n"];
   while (turns < 40) {
     const ia = await info(A);
     if (ia.ph === "end") break;
@@ -154,22 +159,47 @@ const other = p => p === "x" ? "o" : "x";
     syncOk = syncOk && same1;
     console.log(`  tah ${turns + 1}: ${nm} trefil ${best.ko} → stav ${JSON.stringify(ip.alive)}${same1 ? "" : " NESHODA"}`);
     if (ip.ph === "end") break;
-    await P.waitForSelector("#buildBox:not([hidden])", { timeout: T });
-    if (!sawBuild || (P === B && turns < 2)) await shot(P, `09-stavba-${P === A ? "desktop" : "iphone"}-${turns}`);
-    if (!sawBuild && P === A) {
-      const bb = await A.locator("#buildBox").boundingBox();
-      check("desktop: panel stavby vpravo uprostřed", bb.x > 900 && bb.y > 100 && bb.y + bb.height < 760, JSON.stringify(bb));
+    // twist: střelec vybírá ježka pro soupeře (když zbývá jediný druh, přijde sám)
+    if (ip.ph === "pick") {
+      await P.waitForSelector("#pickBox:not([hidden])", { timeout: T });
+      if (!sawPick || (P === B && turns < 2)) await shot(P, `09-vyber-jezka-${P === A ? "desktop" : "iphone"}-${turns}`);
+      if (!sawPick && P === A) {
+        const bb = await A.locator("#pickBox").boundingBox();
+        check("desktop: panel výběru ježka dole uprostřed mezi pevnostmi (nezakrývá cíl)", bb.x > 340 && bb.x + bb.width < 1030 && bb.y + bb.height < 820, JSON.stringify(bb));
+        const used = await A.locator("#kinds .btn:disabled").count(), all = await A.locator("#kinds .btn").count();
+        check("výběr ježka: 4 druhy, všechny dostupné v 1. kole", all === 4 && used === 0, `${all} druhů, ${used} nedostupných`);
+      }
+      sawPick = true;
+      const avail = (await info(P)).pl[ia.p === "x" ? "o" : "x"];
+      const want = WANT.find(t => avail.includes(t) && !usedTypes.has(t)) || avail[0];
+      await P.click(`#kinds [data-k="${want}"]`);
+      await P.click("#sendBtn");
+      await P.waitForFunction(n => { const i = window.JPT.info(); return i.ph === "aim" && !i.busy; }, 0, { timeout: 60000 });
+      ip = await info(P);
+      await O.waitForFunction(w => { const i = window.JPT.info(); return i.ph === "aim" && !i.replay && i.hg === w; }, want, { timeout: 60000 });
+      const oi = await info(O);
+      const chipTxt = await O.locator("#hogChip").innerText();
+      const seenOk = oi.hg === want && oi.p === other(ia.p) && chipTxt.includes(NAMES[want]) && oi.me === oi.p;
+      if (seenOk) twistSeen++;
+      if (firstRound === null) {
+        firstRound = seenOk;
+        check("twist v 1. kole: soupeř po prvním výstřelu vidí ježka, kterého mu vybral střelec", seenOk, `${NAMES[want]} / „${chipTxt.replace(/\s+/g, " ")}“`);
+        await shot(O, "09b-jezek-od-soupere-" + (O === A ? "desktop" : "iphone"));
+      }
+      usedTypes.add(want);
+    } else {
+      // pool měl jediný druh: přišel sám
+      await O.waitForFunction(() => { const i = window.JPT.info(); return i.ph === "aim" && !i.replay; }, null, { timeout: 60000 });
+      twistSeen++;
     }
-    sawBuild = true;
-    await P.click(`#kinds [data-k="${["sB", "wP", "gP"][turns % 3]}"]`);
-    await P.click("#dropBtn");
-    await P.waitForFunction(n => { const i = window.JPT.info(); return i.n > n && !i.busy && !i.acting; }, ip.n, { timeout: 60000 });
-    ip = await info(P);
-    await O.waitForFunction(n => { const i = window.JPT.info(); return i.n >= n && !i.replay; }, ip.n, { timeout: 60000 });
     turns++;
   }
   check("výstřel se u soupeře přehrál z klíčových snímků", sawReplay);
-  check("fáze stavby proběhla a předala tah", sawBuild);
+  check("výběr ježka proběhl a předal tah (druhy: " + [...usedTypes].join("") + ")", sawPick && twistSeen >= 2);
+  const stA = await A.evaluate(() => ({ ...window.JPT.stats })), stB = await B.evaluate(() => ({ ...window.JPT.stats }));
+  check("reakce postaviček u střelce i u soupeře (radost / úlek / facepalm)", stA.cheer + stA.sad + stA.shock > 0 && stB.cheer + stB.sad + stB.shock > 0, `A ${JSON.stringify(stA)} · B ${JSON.stringify(stB)}`);
+  check("při letu ježka se postavičky bojí a při zásahu cukají", stA.fearFrames + stB.fearFrames > 10 && stA.hitFrames + stB.hitFrames > 0, `strach ${stA.fearFrames + stB.fearFrames} snímků, cuknutí ${stA.hitFrames + stB.hitFrames}`);
+  check("kostky se rozpadají na úlomky a rozhodující zásah zpomalí", stA.frag + stB.frag > 0 && stA.ko + stB.ko > 0, `úlomky ${stA.frag + stB.frag}, KO ${stA.ko + stB.ko}, zpomalení ${stA.slow + stB.slow}, bouchnutí ${stA.boom + stB.boom}`);
   check("oba prohlížeče mají po každém tahu stejné počty postaviček", syncOk);
   const fa = await info(A), fb = await info(B);
   check("partie skončila výhrou", fa.ph === "end" && !!fa.win && fb.ph === "end" && fb.win === fa.win, `vítěz ${fa.win} po ${turns + 1} tazích`);
@@ -180,6 +210,7 @@ const other = p => p === "x" ? "o" : "x";
   const ser = await A.locator("#endSeries").innerText();
   check("skóre série 1 : 0 pro vítěze", fa.win === "x" ? ser === "Mark 1 : 0 Radka" : ser === "Mark 0 : 1 Radka", ser);
   await shot(A, "10-konec-desktop"); await shot(B, "11-konec-iphone");
+  await B.waitForTimeout(900); await shot(B, "11-konec-iphone"); await B.setViewportSize({ width: 390, height: 664 }); await B.waitForTimeout(900); await shot(B, "12-konec-iphone-vyska"); await B.setViewportSize({ width: 844, height: 390 }); await B.waitForTimeout(300);
 
   // 5) odveta
   await W_.click("#endPrimary");

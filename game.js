@@ -8,11 +8,10 @@
   const TEST = /[?&]test\b/.test(location.search);
   const mq = matchMedia("(prefers-reduced-motion: reduce)");
   const calm = () => mq.matches;
-  const INK = "#2B1638";
-  const TEAM = {
-    x: { c: "#FF7A2F", d: "#D9541A", belly: "#FFD7A8", name: "Křečci" },
-    o: { c: "#9B6BFF", d: "#7346D9", belly: "#E6D8FF", name: "Sovičky" },
-  };
+  const STATS = { ko: 0, slow: 0, frag: 0, boom: 0, cheer: 0, sad: 0, shock: 0, fearFrames: 0, hitFrames: 0, freeze: 0 };   // jen pro testy (?test)
+  const { INK, TEAM, drawCritter, drawHog, drawBlock, MATCOL } = ART;
+  const outline = (c, lw) => ART.stroke(c, lw);
+  const circle = ART.circle, rrect = ART.rrect;
   const { W, GY, SLING, ZONE, PLINTHS, HILL, KIND, CR, HOG_R } = JP;
 
   // ---------- zvuk (WebAudio, zapne se po prvním dotyku) ----------
@@ -56,6 +55,8 @@
       else if (m === "c") tone(700, 0.12, { vol: v * 0.7, to: 1300 });
       else tone(110, 0.14, { vol: v * 0.8, to: 60 });
     },
+    boom() { noise(0.5, { vol: 0.5, f: 900, to: 90, q: 0.7, kind: "lowpass" }); tone(110, 0.4, { type: "sawtooth", vol: 0.22, to: 38 }); },
+    pick() { tone(520, 0.08, { type: "triangle", vol: 0.12 }); tone(780, 0.12, { type: "triangle", vol: 0.12, delay: 0.07 }); },
     ko() { tone(900, 0.12, { vol: 0.16, to: 1500 }); tone(1500, 0.3, { type: "triangle", vol: 0.12, to: 300, delay: 0.1 }); noise(0.25, { vol: 0.12, f: 900, delay: 0.08 }); },
     drop() { tone(260, 0.1, { type: "triangle", vol: 0.1, to: 180 }); },
     win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.28, { type: "triangle", vol: 0.16, delay: i * 0.12 })); },
@@ -63,87 +64,6 @@
     turn() { tone(660, 0.1, { vol: 0.1 }); tone(990, 0.14, { vol: 0.1, delay: 0.09 }); },
   };
   const buzz = ms => attempt(() => navigator.vibrate && navigator.vibrate(ms || 12));
-
-  // ---------- kreslení postaviček a kostek ----------
-  function outline(c, lw) { c.lineWidth = lw; c.strokeStyle = INK; c.lineJoin = "round"; c.lineCap = "round"; c.stroke(); }
-  function circle(c, x, y, r) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); }
-  function rrect(c, x, y, w, h, r) { c.beginPath(); c.roundRect ? c.roundRect(x, y, w, h, r) : c.rect(x, y, w, h); }
-
-  // postavička: t = "x" křeček, "o" sovička; look = směr pohledu (-1..1); hurt 0..1; ko = šedá
-  function drawCritter(c, team, lw, hurt = 0, look = 0, ko = false) {
-    const T = TEAM[team], r = CR;
-    const col = ko ? "#C9C2CE" : T.c, belly = ko ? "#E6E1EA" : T.belly;
-    if (team === "x") {
-      for (const s of [-1, 1]) { circle(c, s * 11, -14, 7.5); c.fillStyle = col; c.fill(); outline(c, lw); circle(c, s * 11, -14, 3.6); c.fillStyle = ko ? "#ddd" : "#FF9DB0"; c.fill(); }
-      circle(c, 0, 0, r); c.fillStyle = col; c.fill(); outline(c, lw);
-      c.beginPath(); c.ellipse(0, 7, 12, 10, 0, 0, Math.PI * 2); c.fillStyle = belly; c.fill();
-    } else {
-      for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * 6, -16); c.lineTo(s * 15, -25); c.lineTo(s * 16, -10); c.closePath(); c.fillStyle = col; c.fill(); outline(c, lw); }
-      circle(c, 0, 0, r); c.fillStyle = col; c.fill(); outline(c, lw);
-      c.beginPath(); c.ellipse(0, 8, 11, 9, 0, 0, Math.PI * 2); c.fillStyle = belly; c.fill();
-      c.strokeStyle = ko ? "#aaa" : T.d; c.lineWidth = 1.4;
-      for (const [x, y] of [[-4, 6], [4, 6], [0, 11]]) { c.beginPath(); c.moveTo(x - 2.5, y - 1); c.lineTo(x, y + 1.5); c.lineTo(x + 2.5, y - 1); c.stroke(); }
-    }
-    const er = team === "o" ? 6 : 4.6, ex = team === "o" ? 7.2 : 6.5, ey = -4;
-    if (ko) {
-      c.strokeStyle = INK; c.lineWidth = 1.8;
-      for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * ex - 3, ey - 3); c.lineTo(s * ex + 3, ey + 3); c.moveTo(s * ex + 3, ey - 3); c.lineTo(s * ex - 3, ey + 3); c.stroke(); }
-    } else {
-      for (const s of [-1, 1]) {
-        circle(c, s * ex, ey, er); c.fillStyle = "#fff"; c.fill(); outline(c, lw * 0.6);
-        circle(c, s * ex + look * er * 0.4, ey + 0.6, er * 0.5); c.fillStyle = INK; c.fill();
-        circle(c, s * ex + look * er * 0.4 + 1, ey - 0.8, er * 0.17); c.fillStyle = "#fff"; c.fill();
-      }
-      if (hurt > 0.15) { c.strokeStyle = INK; c.lineWidth = 1.8; for (const s of [-1, 1]) { c.beginPath(); c.moveTo(s * (ex + er), ey - er - 2); c.lineTo(s * (ex - er + 1), ey - er - 4 + hurt * 3); c.stroke(); } }
-    }
-    if (team === "o") { c.beginPath(); c.moveTo(-3, 1); c.lineTo(3, 1); c.lineTo(0, 6); c.closePath(); c.fillStyle = ko ? "#bbb" : "#FFB020"; c.fill(); outline(c, lw * 0.5); }
-    else {
-      if (!ko) { c.fillStyle = "rgba(255,90,120,.45)"; for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * 12, 3, 3.6, 2.4, 0, 0, Math.PI * 2); c.fill(); } }
-      c.strokeStyle = INK; c.lineWidth = 1.5; c.beginPath(); c.moveTo(-3, 3); c.quadraticCurveTo(-1.5, 5, 0, 3); c.quadraticCurveTo(1.5, 5, 3, 3); c.stroke();
-    }
-  }
-  function drawHog(c, team, lw) {
-    const R = HOG_R;
-    c.beginPath();
-    for (let i = 0; i < 28; i++) {
-      const a = i / 28 * Math.PI * 2, rr = i % 2 ? R + 1 : R + 7.5;
-      c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
-    }
-    c.closePath(); c.fillStyle = "#6B4226"; c.fill(); outline(c, lw);
-    circle(c, 0, 0, R - 1); c.fillStyle = "#8A5A3B"; c.fill();
-    circle(c, 6, 4, 9.5); c.fillStyle = "#FFE3BE"; c.fill(); outline(c, lw * 0.6);
-    circle(c, 14, 6, 2.6); c.fillStyle = INK; c.fill();
-    c.strokeStyle = INK; c.lineWidth = 1.6; c.beginPath(); c.arc(7, 1, 2.6, Math.PI * 1.1, Math.PI * 1.9); c.stroke();
-    c.beginPath(); c.arc(-4, 2, R - 3, Math.PI * 0.55, Math.PI * 0.95); c.strokeStyle = TEAM[team].c; c.lineWidth = 5; c.stroke();
-  }
-  const MATCOL = { w: ["#E9A55A", "#C77F35"], s: ["#A8B3C4", "#7D889A"], g: ["rgba(189,239,255,.62)", "rgba(120,200,230,.9)"] };
-  function drawBlock(c, k, lw, dmg = 0, seed = 1) {
-    const K = KIND[k], w = K.w, h = K.h, [fill, dark] = MATCOL[K.m];
-    rrect(c, -w / 2, -h / 2, w, h, K.m === "s" ? 5 : 3); c.fillStyle = fill; c.fill();
-    c.save(); c.clip();
-    if (K.m === "w") {
-      c.strokeStyle = dark; c.lineWidth = 1.6;
-      const long = w > h, L = long ? w : h, S = long ? h : w;
-      for (let i = 1; i <= 2; i++) { const o = -S / 2 + S * i / 3; c.beginPath(); if (long) { c.moveTo(-L / 2 + 6, o); c.bezierCurveTo(-L / 6, o + 2, L / 6, o - 2, L / 2 - 6, o); } else { c.moveTo(o, -L / 2 + 6); c.bezierCurveTo(o + 2, -L / 6, o - 2, L / 6, o, L / 2 - 6); } c.stroke(); }
-      c.fillStyle = "rgba(255,255,255,.25)"; c.fillRect(-w / 2, -h / 2, w, Math.min(5, h * 0.25));
-    } else if (K.m === "s") {
-      c.fillStyle = "rgba(255,255,255,.35)"; c.fillRect(-w / 2, -h / 2, w, 6);
-      c.fillStyle = dark; for (let i = 0; i < 5; i++) { const px = ((seed * 37 + i * 53) % 100) / 100 - 0.5, py = ((seed * 61 + i * 29) % 100) / 100 - 0.5; circle(c, px * w * 0.8, py * h * 0.8, 1.8); c.fill(); }
-    } else {
-      c.strokeStyle = "rgba(255,255,255,.9)"; c.lineWidth = 3; c.beginPath(); const m = Math.min(w, h);
-      c.moveTo(-w / 2 + m * 0.3, h / 2); c.lineTo(w / 2, -h / 2 + m * 0.3); c.stroke();
-    }
-    if (dmg > 0.3) {
-      c.strokeStyle = INK; c.lineWidth = 1.4; c.beginPath();
-      let x = ((seed * 13) % 10 - 5) * w / 14, y = -h / 2;
-      c.moveTo(x, y);
-      for (let i = 0; i < 4; i++) { x += ((seed * (i + 3)) % 7 - 3) * 2.2; y += h / 4; c.lineTo(x, y); }
-      if (dmg > 0.62) { c.moveTo(-w / 2, ((seed * 7) % 5 - 2) * h / 10); c.lineTo(-w / 6, h / 10); c.lineTo(w / 8, -h / 12); }
-      c.stroke();
-    }
-    c.restore();
-    rrect(c, -w / 2, -h / 2, w, h, K.m === "s" ? 5 : 3); outline(c, lw);
-  }
 
   // ---------- plátno a kamera ----------
   const cv = $("stage"), ctx = cv.getContext("2d");
@@ -162,7 +82,7 @@
   const overview = () => Math.min(cw / 1440, (ch - 80) / 640);     // celá scéna
   const minS = () => overview() * 0.9, maxS = () => Math.max(overview() * 3.2, 1.2);
   // y světa GY+70 leží na této výšce obrazovky
-  const anchorY = () => portrait() ? Math.min(ch - 40, ch * 0.72 + cam.s * 70) : ch;   // zem asi ve 72 % výšky
+  const anchorY = () => portrait() ? Math.min(ch - 40, ch * 0.8 + cam.s * 70) : ch;   // zem asi v 78 % výšky
   function clampCam(x, s) {
     s = clamp(s, minS(), maxS());
     const half = cw / (2 * s);
@@ -173,7 +93,7 @@
   // výchozí pohled: na desktopu a na šířku celá scéna, na výšku přiblížená vlastní strana
   function autoView() {
     const ov = overview();
-    if (portrait()) return { x: W / 2, s: Math.max(ov, cw / 1280) };   // obě pevnosti přes celou šířku
+    if (portrait()) return { x: W / 2, s: Math.max(ov, cw / 1180) };   // obě pevnosti (bez okrajů podstavců) přes celou šířku
     return { x: W / 2, s: ov };
   }
   const fullNow = () => !(cam.user && cam.user.s > autoView().s * 1.05);   // není přiblíženo víc než výchozí záběr
@@ -192,56 +112,100 @@
     if (h) { s = zoomS; x = h.x; cam.holdX = h.x; cam.hold = 75; }
     else if (cam.hold > 0) { s = zoomS; x = cam.holdX; }
     else if (cam.user) return clampCam(cam.user.x, cam.user.s);
-    else if (building()) { s = Math.max(ov, Math.min(cw / 760, (ch - 200) / 520)); x = (ZONE[me][0] + ZONE[me][1]) / 2; }
     else return clampCam(autoView().x, autoView().s);
     return clampCam(x, s);
   }
 
-  // ---------- pozadí s paralaxou ----------
-  const clouds = Array.from({ length: 7 }, (_, i) => ({ x: i * 330 - 300, y: 120 + (i * 97) % 260, k: 0.7 + (i * 37 % 10) / 20 }));
-  let drift = 0;
-  function bg(t) {
-    const s = cam.s, [, gyS] = toScreen(0, GY);
-    const sky = ctx.createLinearGradient(0, 0, 0, gyS);
-    sky.addColorStop(0, "#5CC8EE"); sky.addColorStop(0.6, "#A9E6F4"); sky.addColorStop(1, "#FFF1C4");
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, cw, ch);
-    // slunce
-    const sr = 40 * clamp(s, 0.45, 1), sunX = cw * 0.28 - cam.x * s * 0.03, sunY = Math.max(150 + sr, gyS - 600 * s);
-    ctx.fillStyle = "#FFF3C2"; circle(ctx, sunX, sunY, sr * 1.55); ctx.fill();
-    ctx.fillStyle = "#FFE27A"; circle(ctx, sunX, sunY, sr); ctx.fill(); outline(ctx, 3);
-    ctx.fillStyle = "#FFF7D6"; circle(ctx, sunX - sr * 0.35, sunY - sr * 0.35, sr * 0.22); ctx.fill();
-    // mraky
-    if (!calm()) drift += 0.12;
-    for (const c of clouds) {
-      const span = (W + 900);
-      const wx = ((c.x + drift * c.k) % span + span) % span - 450;
-      const sx = cw / 2 + (wx - cam.x * 0.25 - W * 0.375) * s * 0.9, sy = gyS - (520 + c.y) * s;
-      const r = 34 * s * c.k + 10, lw = 2.5;
-      const blobs = [[0, 0, 1], [r * 0.95, -r * 0.5, 0.95], [r * 1.9, -r * 0.15, 0.85], [r * 2.6, r * 0.25, 0.62], [r * 1.2, r * 0.32, 0.75]];
-      const flat = sy + r * 0.62;
-      ctx.save(); ctx.beginPath(); ctx.rect(sx - r * 2, sy - r * 3, r * 7, flat - (sy - r * 3) + lw); ctx.clip();
-      ctx.fillStyle = INK;
-      for (const [dx, dy, k] of blobs) { circle(ctx, sx + dx, sy + dy, r * k + lw); ctx.fill(); }
-      ctx.fillStyle = "#fff";
-      for (const [dx, dy, k] of blobs) { circle(ctx, sx + dx, sy + dy, r * k); ctx.fill(); }
-      ctx.restore();
-      ctx.beginPath(); ctx.moveTo(sx - r * 0.86, flat); ctx.lineTo(sx + r * 2.98, flat); ctx.strokeStyle = INK; ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.stroke();
-    }
-    // vzdálené kopce (0.35) a keře (0.65)
-    layer(0.35, "#8FD3C0", "#79C3AF", X => 130 + 45 * Math.sin(X / 190) + 30 * Math.sin(X / 83 + 1.3), 40);
-    layer(0.62, "#58B86C", "#4AA35D", X => 70 + 28 * Math.sin(X / 120 + 0.5) + 18 * Math.abs(Math.sin(X / 47)), 18);
+  // ---------- pozadí: klidné, ať nepřebíjí hru (bez slunce, mraků a přechodů) ----------
+  const SKY = "#86D9F2";
+  function bg() {
+    ctx.fillStyle = SKY; ctx.fillRect(0, 0, cw, ch);
+    layer(0.35, "#A9E2D3", X => 120 + 40 * Math.sin(X / 190) + 26 * Math.sin(X / 83 + 1.3), 40);
+    layer(0.62, "#88D09F", X => 64 + 24 * Math.sin(X / 120 + 0.5) + 14 * Math.abs(Math.sin(X / 47)), 18);
   }
-  function layer(f, col, col2, hgt, base) {
+  function layer(f, col, hgt, base) {
     const s = cam.s, gyS = toScreen(0, GY)[1];
-    const sx0 = 0, step = 8;
     ctx.beginPath(); ctx.moveTo(-10, ch + 10);
-    for (let sx = sx0 - 10; sx <= cw + 10; sx += step) {
+    for (let sx = -10; sx <= cw + 10; sx += 8) {
       const X = cam.x * f + (sx - cw / 2) / s;
       ctx.lineTo(sx, gyS - (hgt(X) + base) * s);
     }
     ctx.lineTo(cw + 10, ch + 10); ctx.closePath();
-    const gr = ctx.createLinearGradient(0, gyS - 200 * s, 0, gyS); gr.addColorStop(0, col); gr.addColorStop(1, col2);
-    ctx.fillStyle = gr; ctx.fill(); outline(ctx, Math.max(1.6, 2.6 * s));
+    ctx.fillStyle = col; ctx.fill();
+  }
+
+  // ---------- stav postaviček v rendereru (výrazy a reakce; nic se nesynchronizuje) ----------
+  // Odvozuje se z těles ve scéně (poloha, životy), ježka (vzdálenost) a událostí (zásah, KO, výsledek výstřelu),
+  // takže soupeř vidí totéž co střelec z přehrávaných snímků a událostí.
+  const CS = new Map();
+  let animT = 0, frameN = 0, lastBodies = new Map();
+  const TAU = Math.PI * 2, rnd = (a, b) => a + Math.random() * (b - a);
+  function csOf(b) {
+    let s = CS.get(b.id);
+    if (!s) { s = { t: b.t, x: b.x, y: b.y, vx: 0, vy: 0, rot: b.a, hp: b.hp, blinkIn: rnd(40, 240), blinkT: 0, fear: 0, hit: 0, startle: 0, cheer: 0, sad: 0, ph: (b.id * 1.713) % TAU, lx: 0, ly: 0, last: frameN }; CS.set(b.id, s); }
+    return s;
+  }
+  function csUpdate(bodies, hog, dtf) {
+    frameN++; animT += dtf / 60;
+    lastBodies = new Map();
+    for (const b of bodies) lastBodies.set(b.id, b);
+    for (const b of bodies) {
+      if (b.k !== "C") continue;
+      const s = csOf(b);
+      if (Math.abs(b.x - s.x) > 160 || Math.abs(b.y - s.y) > 160) { s.vx = s.vy = 0; s.hp = b.hp; s.rot = b.a; }
+      s.vx += ((b.x - s.x) / dtf - s.vx) * 0.4; s.vy += ((b.y - s.y) / dtf - s.vy) * 0.4;
+      s.x = b.x; s.y = b.y; s.t = b.t; s.last = frameN;
+      if (b.hp < s.hp - 1.2) { s.hit = 1; s.startle = 1; }
+      if (s.fear > 0.5) STATS.fearFrames++;
+      if (s.hit > 0.35) STATS.hitFrames++;
+      s.hp = b.hp;
+      const speed = Math.hypot(s.vx, s.vy);
+      if (speed > 0.9) s.rot = b.a; else s.rot += (Math.round(s.rot / TAU) * TAU - s.rot) * Math.min(1, 0.12 * dtf);
+      // strach a pohled podle ježka
+      let ft = 0, lx = (b.t === "x" ? 0.75 : -0.75) + Math.sin(animT * 0.5 + s.ph) * 0.35, ly = -0.1 + Math.sin(animT * 0.37 + s.ph * 2) * 0.25;
+      if (hog) {
+        const dx = hog.x - b.x, dy = hog.y - b.y, d = Math.hypot(dx, dy);
+        if (d < 800) { lx = dx / (d || 1); ly = dy / (d || 1); }
+        if (d < 340) ft = (1 - d / 340) * (hog.team === b.t ? 0.45 : 1);
+      }
+      s.fear += (ft - s.fear) * Math.min(1, 0.14 * dtf);
+      s.lx += (lx - s.lx) * Math.min(1, 0.2 * dtf); s.ly += (ly - s.ly) * Math.min(1, 0.2 * dtf);
+      s.hit = Math.max(0, s.hit - dtf / 26); s.startle = Math.max(0, s.startle - dtf / 34);
+      s.cheer = Math.max(0, s.cheer - dtf / 100); s.sad = Math.max(0, s.sad - dtf / 100);
+      s.blinkIn -= dtf;
+      if (s.blinkIn <= 0) { s.blinkT = 7; s.blinkIn = rnd(120, 300); }
+      if (s.blinkT > 0) s.blinkT -= dtf;
+    }
+  }
+  function poseOf(b) {
+    const s = CS.get(b.id), M = !calm();
+    const k = Math.cos(-s.rot), n = Math.sin(-s.rot);
+    const o = {
+      hurt: b.max ? clamp(1 - b.hp / b.max, 0, 1) : 0, lookX: s.lx * k - s.ly * n, lookY: s.lx * n + s.ly * k,
+      blink: M && s.blinkT > 0 ? Math.sin(Math.PI * (1 - Math.max(0, s.blinkT) / 7)) : 0,
+      fear: s.fear, hit: s.hit, cheer: s.cheer > 0 ? Math.min(1, s.cheer * 3) : 0, sad: s.sad > 0 ? Math.min(1, s.sad * 3) : 0, startle: s.startle, t: animT + s.ph, still: !M,
+    };
+    const breath = M ? 1 + Math.sin(animT * 2.4 + s.ph) * 0.016 : 1, sq = M ? s.hit * 0.13 : 0;
+    const hop = M ? -(o.cheer > 0 ? Math.abs(Math.sin(animT * 9 + s.ph)) * 9 * Math.min(1, s.cheer * 2) : 0) - s.startle * 3 : 0;
+    return { o, rot: s.rot, dy: hop, sx: breath * (1 + sq), sy: breath * (1 - sq) };
+  }
+  // nálada celého týmu (živé postavičky)
+  function mood(team, what, str = 1) {
+    for (const s of CS.values()) {
+      if (s.t !== team || frameN - s.last > 3) continue;
+      STATS[what]++;
+      if (what === "cheer") { s.cheer = str; s.sad = 0; } else if (what === "sad") { s.sad = str; s.cheer = 0; } else if (what === "shock") { s.startle = 1; s.fear = Math.max(s.fear, 0.6); }
+    }
+  }
+  // výsledek výstřelu: radost, úlek nebo facepalm (evs = události jednoho tahu)
+  function reactToShot(by, evs) {
+    const opp = other(by), teamOf = id => (CS.get(id) || {}).t;
+    const kos = evs.filter(e => e.type === "k" && e.m === opp).length, selfKo = evs.filter(e => e.type === "k" && e.m === by).length;
+    const hurt = evs.filter(e => e.type === "d" && teamOf(e.id) === opp).length, wrecked = evs.filter(e => e.type === "b").length;
+    if (kos) { mood(by, "cheer", 1); mood(opp, "shock"); }
+    else if (hurt || wrecked >= 2) { mood(by, "cheer", 0.45); mood(opp, "shock"); }
+    else if (!selfKo) { mood(by, "sad", 1); mood(opp, "cheer", 0.4); }
+    if (selfKo) { mood(by, "sad", 1); }
   }
 
   // ---------- svět ----------
@@ -256,38 +220,30 @@
     // zem
     const left = cam.x - cw / cam.s, right = cam.x + cw / cam.s;
     ctx.fillStyle = "#C98A4B"; ctx.fillRect(left, GY, right - left, 4000);
-    ctx.fillStyle = "#B5763E"; for (let x = Math.floor(left / 90) * 90; x < right; x += 90) { circle(ctx, x + 30, GY + 52 + (x % 7) * 6, 7); ctx.fill(); circle(ctx, x + 70, GY + 110 + (x % 5) * 8, 5); ctx.fill(); }
+    ctx.fillStyle = "#B97C40"; for (let x = Math.floor(left / 180) * 180; x < right; x += 180) { circle(ctx, x + 40, GY + 70 + (x % 7) * 8, 6); ctx.fill(); circle(ctx, x + 120, GY + 140 + (x % 5) * 10, 4.5); ctx.fill(); }
     ctx.fillStyle = "#6CCB3A"; ctx.fillRect(left, GY - 2, right - left, 22);
     ctx.beginPath(); ctx.moveTo(left, GY + 20); ctx.lineTo(right, GY + 20); ctx.strokeStyle = "#4E9E2A"; ctx.lineWidth = 3; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(left, GY); ctx.lineTo(HILL.x - Math.sqrt(HILL.r ** 2 - (GY - HILL.y) ** 2), GY);
     ctx.moveTo(HILL.x + Math.sqrt(HILL.r ** 2 - (GY - HILL.y) ** 2), GY); ctx.lineTo(right, GY); outline(ctx, lw);
-    ctx.strokeStyle = "#4E9E2A"; ctx.lineWidth = 2.4;
-    for (let x = Math.floor(left / 46) * 46; x < right; x += 46) { const y = groundAt(x + 10); ctx.beginPath(); ctx.moveTo(x + 4, y + 1); ctx.lineTo(x + 8, y - 9); ctx.lineTo(x + 12, y + 1); ctx.lineTo(x + 17, y - 6); ctx.stroke(); }
     // podstavce
-    for (const t of ["x", "o"]) { const [a, b] = PLINTHS[t]; rrect(ctx, a, GY - 30, b - a, 32, 5); ctx.fillStyle = "#8E98AA"; ctx.fill(); outline(ctx, lw); ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.fillRect(a + 4, GY - 27, b - a - 8, 5); }
+    for (const t of ["x", "o"]) { const [a, b] = PLINTHS[t]; rrect(ctx, a, GY - 30, b - a, 32, 5); ctx.fillStyle = "#8E98AA"; ctx.fill(); ctx.save(); ctx.clip(); ctx.fillStyle = "rgba(255,255,255,.25)"; ctx.fillRect(a, GY - 30, b - a, 6); ctx.fillStyle = "rgba(43,22,56,.14)"; ctx.fillRect(a, GY - 8, b - a, 10); ctx.restore(); rrect(ctx, a, GY - 30, b - a, 32, 5); outline(ctx, lw); }
     // praky (zadní guma)
     for (const t of ["x", "o"]) drawSling(t, lw, scene, 0);
     // tělesa
     for (const b of scene.bodies) {
-      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a);
+      ctx.save();
       if (b.k === "C") {
-        const look = b.t === "x" ? 1 : -1;
-        drawCritter(ctx, b.t, lw, b.max ? clamp(1 - b.hp / b.max, 0, 1) : 0, look);
-      } else drawBlock(ctx, b.k, lw, b.max ? 1 - b.hp / b.max : 0, b.id);
+        const p = poseOf(b);
+        ctx.translate(b.x, b.y + p.dy); ctx.rotate(p.rot); ctx.translate(0, 19); ctx.scale(p.sx, p.sy); ctx.translate(0, -19);
+        drawCritter(ctx, b.t, lw, p.o);
+      } else { ctx.translate(b.x, b.y); ctx.rotate(b.a); drawBlock(ctx, b.k, lw, b.max ? 1 - b.hp / b.max : 0, b.id); }
       ctx.restore();
-    }
-    if (scene.ghost) {
-      const g = scene.ghost; ctx.save(); ctx.globalAlpha = 0.55 + 0.2 * Math.sin(performance.now() / 200);
-      ctx.translate(g.x, g.y); if (g.rot) ctx.rotate(Math.PI / 2); drawBlock(ctx, g.k, lw, 0, 3); ctx.restore();
-      ctx.save(); ctx.setLineDash([10, 8]); ctx.strokeStyle = "rgba(43,22,56,.5)"; ctx.lineWidth = lw * 0.7;
-      ctx.beginPath(); ctx.moveTo(g.x, g.y + 30); ctx.lineTo(g.x, GY - 34); ctx.stroke(); ctx.restore();
-      const [z0, z1] = ZONE[me]; rrect(ctx, z0, GY - 6, z1 - z0, 10, 5); ctx.fillStyle = "#C6F432"; ctx.fill(); outline(ctx, lw * 0.6);
     }
     // náhled dráhy
     if (scene.dots) {
-      scene.dots.forEach((p, i) => { circle(ctx, p[0], p[1], Math.max(2.2, 6 - i * 0.12) ); ctx.fillStyle = `rgba(255,255,255,${1 - i / scene.dots.length * 0.75})`; ctx.fill(); ctx.lineWidth = lw * 0.5; ctx.strokeStyle = "rgba(43,22,56,.6)"; ctx.stroke(); });
+      scene.dots.forEach((p, i) => { circle(ctx, p[0], p[1], Math.max(2.4, 6.2 - i * 0.13)); ctx.fillStyle = `rgba(255,255,255,${1 - i / scene.dots.length * 0.75})`; ctx.fill(); ctx.lineWidth = lw * 0.5; ctx.strokeStyle = "rgba(43,22,56,.6)"; ctx.stroke(); });
     }
-    if (scene.hog) { const h = scene.hog; ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.a); drawHog(ctx, h.team, lw); ctx.restore(); }
+    if (scene.hog) { const h = scene.hog; ctx.save(); ctx.translate(h.x, h.y); ctx.rotate(h.a); drawHog(ctx, h.team, lw, h.type, { t: animT }); ctx.restore(); }
     for (const t of ["x", "o"]) drawSling(t, lw, scene, 1);
     drawParticles(lw);
     // ježek mimo obrazovku nahoře
@@ -300,76 +256,140 @@
     const s = SLING[t], gy = groundAt(s.x), dir = t === "x" ? 1 : -1;
     const tipA = [s.x - 17, s.y - 4], tipB = [s.x + 17, s.y - 4];
     const pulled = scene.pull && scene.pull.team === t ? scene.pull : null;
-    const pouch = pulled ? [pulled.x, pulled.y] : [s.x, s.y + 4];
-    const band = tip => { ctx.beginPath(); ctx.moveTo(tip[0], tip[1]); ctx.lineTo(pouch[0], pouch[1]); ctx.strokeStyle = "#5A2A3A"; ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.stroke(); };
-    if (!front) {
-      band(dir > 0 ? tipA : tipB);
-      return;
-    }
+    const idle = scene.loaded === t && !pulled && !calm() ? Math.sin(animT * 2.6) * 1.6 : 0;
+    const pouch = pulled ? [pulled.x, pulled.y] : [s.x - dir * (scene.loaded === t ? 3 : 0) + idle * -dir * 0.4, s.y + 16 + idle];
+    // guma: tmavý obrys + sytá barva, ať je vidět i když je krátká
+    const band = tip => {
+      ctx.lineCap = "round"; ctx.beginPath(); ctx.moveTo(tip[0], tip[1]); ctx.lineTo(pouch[0], pouch[1]);
+      ctx.strokeStyle = ART.INK; ctx.lineWidth = 9; ctx.stroke(); ctx.strokeStyle = "#E0436B"; ctx.lineWidth = 4.5; ctx.stroke();
+    };
+    if (!front) { band(dir > 0 ? tipA : tipB); return; }
     ctx.beginPath(); ctx.moveTo(s.x - 6, gy + 6); ctx.lineTo(s.x - 6, s.y + 34); ctx.lineTo(tipA[0] - 5, tipA[1]); ctx.lineTo(tipA[0] + 5, tipA[1] - 2);
     ctx.lineTo(s.x, s.y + 24); ctx.lineTo(tipB[0] - 5, tipB[1] - 2); ctx.lineTo(tipB[0] + 5, tipB[1]); ctx.lineTo(s.x + 6, s.y + 34); ctx.lineTo(s.x + 6, gy + 6); ctx.closePath();
     ctx.fillStyle = "#B8763F"; ctx.fill(); outline(ctx, lw);
-    if (pulled) { ctx.save(); ctx.translate(pulled.x, pulled.y); ctx.rotate(pulled.a); drawHog(ctx, t, lw); ctx.restore(); }
-    else if (scene.loaded === t) { ctx.save(); ctx.translate(s.x, s.y); drawHog(ctx, t, lw); ctx.restore(); }
+    ctx.save(); ctx.clip(); ctx.fillStyle = "rgba(255,255,255,.2)"; ctx.fillRect(s.x - 7, gy, 4, 120); ctx.fillStyle = "rgba(43,22,56,.18)"; ctx.fillRect(s.x + 3, s.y, 4, 160); ctx.restore();
+    if (pulled) { ctx.save(); ctx.translate(pulled.x, pulled.y); ctx.rotate(pulled.a); drawHog(ctx, t, lw, scene.hogType || "n", { t: animT }); ctx.restore(); }
+    else if (scene.loaded === t) { ctx.save(); ctx.translate(pouch[0], pouch[1] - 4); drawHog(ctx, t, lw, scene.hogType || "n", { t: animT }); ctx.restore(); }
     band(dir > 0 ? tipB : tipA);
     rrect(ctx, pouch[0] - 9, pouch[1] - 5, 18, 10, 4); ctx.fillStyle = "#5A2A3A"; ctx.fill();
   }
 
-  // ---------- částice a třesení ----------
-  let parts = [], shake = 0;
+  // ---------- částice, úlomky, třesení, zpomalení ----------
+  let parts = [], shake = 0, freeze = 0, slow = { t: 0, f: 1 };
   const PCOL = { w: ["#E9A55A", "#C77F35", "#F6C88A"], s: ["#A8B3C4", "#7D889A", "#D5DCE6"], g: ["#E6FBFF", "#BDEFFF", "#ffffff"], c: ["#fff", "#FFE27A"], z: ["#C98A4B", "#6CCB3A"], h: ["#8A5A3B", "#6B4226"] };
+  const MAXP = 380;
   function burst(x, y, m, n, power = 1) {
     if (calm()) n = Math.ceil(n / 3);
     const cols = PCOL[m] || PCOL.z;
-    for (let i = 0; i < n && parts.length < 260; i++) {
-      const a = Math.random() * Math.PI * 2, v = (1.5 + Math.random() * 4.5) * power;
+    for (let i = 0; i < n && parts.length < MAXP; i++) {
+      const a = Math.random() * TAU, v = (1.5 + Math.random() * 4.5) * power;
       parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2.5 * power, life: 0, max: 35 + Math.random() * 30, k: m === "g" ? "shard" : m === "s" || m === "z" ? "dust" : "chip", c: cols[i % cols.length], sz: 3 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - 0.5) * 0.4 });
     }
   }
-  function koFx(x, y, team) {
-    burst(x, y, "c", 10, 1.2);
-    for (let i = 0; i < (calm() ? 2 : 5); i++) parts.push({ x, y: y - 10, vx: (i - 2) * 1.4, vy: -4 - Math.random() * 2, life: 0, max: 60, k: "star", c: "#FFE27A", sz: 9, r: 0, vr: 0.1 });
-    const words = ["Au!", "Jau!", "Ouha!", "Fuj!", "Ajaj!"];
-    parts.push({ x, y: y - 30, vx: 0, vy: -1.1, life: 0, max: 80, k: "text", c: TEAM[team].c, text: words[(x | 0) % words.length], sz: 34, r: 0, vr: 0 });
-    puff.push({ x, y, team, life: 0 });
+  // rozpad kostky na úlomky (tvar a barva podle materiálu kostky)
+  function fragments(e) {
+    const bi = lastBodies.get(e.id), K = bi && KIND[bi.k];
+    if (!K) { burst(e.x, e.y, e.m || "w", 14, 1.2); return; }
+    STATS.frag++;
+    const m = K.m, cols = MATCOL[m], long = K.w >= K.h, L = long ? K.w : K.h;
+    const n = calm() ? 3 : m === "g" ? 9 : m === "s" ? 6 : clamp(Math.round(L / 34), 3, 6);
+    const ca = Math.cos(bi.a), sa = Math.sin(bi.a);
+    for (let i = 0; i < n && parts.length < MAXP; i++) {
+      const u = (i + 0.5) / n - 0.5, lx = long ? u * K.w : (Math.random() - 0.5) * K.w, ly = long ? (Math.random() - 0.5) * K.h : u * K.h;
+      const wx = bi.x + lx * ca - ly * sa, wy = bi.y + lx * sa + ly * ca;
+      const ang = Math.atan2(wy - e.y, wx - e.x) + (Math.random() - 0.5) * 0.9, v = 2 + Math.random() * 4.2;
+      const cell = long ? [K.w / n, K.h] : [K.w, K.h / n];
+      const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([px, py]) => [px * (cell[0] / 2) * (0.7 + Math.random() * 0.3), py * (cell[1] / 2) * (0.7 + Math.random() * 0.3)]);
+      if (m === "g") { pts.length = 3; for (const q of pts) { q[0] *= 0.8; q[1] *= 0.8; } }
+      parts.push({ x: wx, y: wy, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v - 2.2, life: 0, max: 80 + Math.random() * 40, k: "frag", pts, c: cols[0], glass: m === "g", r: bi.a, vr: (Math.random() - 0.5) * 0.45, sz: 1 });
+    }
+    if (m === "w" && !calm()) for (let i = 0; i < 4 && parts.length < MAXP; i++) parts.push({ x: bi.x + (Math.random() - 0.5) * K.w, y: bi.y, vx: (Math.random() - 0.5) * 6, vy: -2 - Math.random() * 4, life: 0, max: 60 + Math.random() * 30, k: "frag", pts: [[-8, -1.2], [8, -1.2], [8, 1.2], [-8, 1.2]], c: cols[1], glass: false, r: Math.random() * 3, vr: (Math.random() - 0.5) * 0.6, sz: 1 });
+    burst(bi.x, bi.y, m === "g" ? "g" : "z", m === "s" ? 10 : 5, 0.8);
   }
-  let puff = [];   // vyřazené postavičky, které ještě chvíli odletují
+  function koFx(x, y, team) {
+    burst(x, y, "c", 8, 1.1);
+    const dir = x > W / 2 ? 1 : -1;
+    puff.push({ x, y, team, life: 0, vx: dir * (1.4 + Math.random()), vy: -8.6, rot: 0, vr: dir * 0.2 });
+    if (!calm()) for (let i = 0; i < 5; i++) parts.push({ x, y: y - 10, vx: (i - 2) * 1.5, vy: -4 - Math.random() * 2, life: 0, max: 60, k: "star", c: "#FFE27A", sz: 9, r: 0, vr: 0.1 });
+    const words = ["Au!", "Jau!", "Ouha!", "Fuj!", "Ajaj!"];
+    parts.push({ x, y: y - 34, vx: 0, vy: -1.1, life: 0, max: 80, k: "text", c: TEAM[team].c, text: words[(x | 0) % words.length], sz: 34, r: 0, vr: 0 });
+  }
+  function boomFx(e) {
+    STATS.boom++;
+    parts.push({ x: e.x, y: e.y, vx: 0, vy: 0, life: 0, max: 26, k: "ring", sz: e.r, c: "#FFD23C", r: 0, vr: 0 });
+    const cols = ["#FFD23C", "#FF8A2A", "#E8413C", "#fff"];
+    for (let i = 0; i < (calm() ? 6 : 16) && parts.length < MAXP; i++) { const a = Math.random() * TAU, v = 2 + Math.random() * 6; parts.push({ x: e.x, y: e.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 1, life: 0, max: 24 + Math.random() * 18, k: "puffball", c: cols[i % 4], sz: 8 + Math.random() * 12, r: 0, vr: 0 }); }
+    burst(e.x, e.y, "z", 10, 1.4);
+  }
+  let puff = [];   // vyřazené postavičky: odlétnou v oblouku a „puf“
+  function puffOut(p) {
+    for (let i = 0; i < (calm() ? 5 : 9) && parts.length < MAXP; i++) { const a = i / 9 * TAU, v = 1.2 + Math.random() * 1.6; parts.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.4, life: 0, max: 30 + Math.random() * 10, k: "puffball", c: "#fff", sz: 8 + Math.random() * 6, r: 0, vr: 0 }); }
+    if (!calm()) for (let i = 0; i < 4; i++) parts.push({ x: p.x, y: p.y, vx: (i - 1.5) * 1.6, vy: -2.4 - i * 0.3, life: 0, max: 46, k: "star", c: "#FFE27A", sz: 8, r: 0, vr: 0.12 });
+  }
   function drawParticles(lw) {
     for (const p of puff) {
-      ctx.save(); ctx.globalAlpha = Math.max(0, 1 - p.life / 50); ctx.translate(p.x, p.y - p.life * 2.2); ctx.rotate(p.life * 0.15); ctx.scale(1 + p.life / 80, 1 + p.life / 80);
-      drawCritter(ctx, p.team, lw, 1, 0, true); ctx.restore();
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1 + p.life / 150, 1 + p.life / 150);
+      drawCritter(ctx, p.team, lw, { ko: true, hurt: 1, t: animT, still: calm(), plain: true }); ctx.restore();
     }
     for (const p of parts) {
-      const al = 1 - p.life / p.max;
+      const al = p.k === "frag" ? Math.min(1, (1 - p.life / p.max) * 3) : 1 - p.life / p.max;
       ctx.save(); ctx.globalAlpha = Math.max(0, al); ctx.translate(p.x, p.y); ctx.rotate(p.r);
       if (p.k === "chip") { ctx.fillStyle = p.c; ctx.fillRect(-p.sz / 2, -p.sz / 5, p.sz, p.sz / 2.5); ctx.strokeStyle = INK; ctx.lineWidth = lw * 0.4; ctx.strokeRect(-p.sz / 2, -p.sz / 5, p.sz, p.sz / 2.5); }
+      else if (p.k === "frag") { ctx.beginPath(); p.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fillStyle = p.c; ctx.fill(); ctx.strokeStyle = p.glass ? "rgba(43,22,56,.6)" : INK; ctx.lineWidth = lw * 0.55; ctx.lineJoin = "round"; ctx.stroke(); }
       else if (p.k === "dust") { circle(ctx, 0, 0, p.sz * (0.6 + p.life / p.max)); ctx.fillStyle = p.c; ctx.fill(); }
       else if (p.k === "shard") { ctx.beginPath(); ctx.moveTo(0, -p.sz); ctx.lineTo(p.sz * 0.6, p.sz * 0.5); ctx.lineTo(-p.sz * 0.5, p.sz * 0.3); ctx.closePath(); ctx.fillStyle = p.c; ctx.fill(); ctx.strokeStyle = "rgba(43,22,56,.6)"; ctx.lineWidth = lw * 0.35; ctx.stroke(); }
-      else if (p.k === "star") { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5, r = i % 2 ? p.sz * 0.45 : p.sz; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } ctx.closePath(); ctx.fillStyle = p.c; ctx.fill(); outline(ctx, lw * 0.5); }
-      else if (p.k === "text") { ctx.rotate(-p.r); ctx.font = `${p.sz}px "Titan One", sans-serif`; ctx.textAlign = "center"; ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.strokeText(p.text, 0, 0); ctx.fillStyle = p.c; ctx.fillText(p.text, 0, 0); }
+      else if (p.k === "star") { ART.star(ctx, 0, 0, p.sz, p.c, lw * 0.5); }
+      else if (p.k === "puffball") { circle(ctx, 0, 0, p.sz * (0.5 + 0.9 * p.life / p.max)); ctx.fillStyle = p.c; ctx.fill(); outline(ctx, lw * 0.6); }
+      else if (p.k === "ring") { const u = p.life / p.max, r = p.sz * (1 - (1 - u) ** 3); circle(ctx, 0, 0, r); ctx.fillStyle = "rgba(255,210,60,.28)"; ctx.fill(); ctx.lineWidth = lw * (1.6 - u); ctx.strokeStyle = "#FF8A2A"; ctx.stroke(); }
+      else if (p.k === "text") { ctx.rotate(-p.r); ctx.font = `${p.sz}px "Titan One", sans-serif`; ctx.textAlign = "center"; ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.lineJoin = "round"; ctx.strokeText(p.text, 0, 0); ctx.fillStyle = p.c; ctx.fillText(p.text, 0, 0); }
       ctx.restore();
     }
   }
   function stepParticles() {
-    for (const p of parts) { p.life++; if (p.k !== "text") { p.vy += 0.25; p.vx *= 0.98; } p.x += p.vx; p.y += p.vy; p.r += p.vr; if (p.k !== "text" && p.y > GY - 2 && p.k !== "dust") { p.y = GY - 2; p.vy *= -0.3; p.vx *= 0.7; } }
+    for (const p of parts) {
+      p.life++;
+      if (p.k === "text" || p.k === "ring") { p.y += p.vy; p.x += p.vx; continue; }
+      p.vy += p.k === "puffball" ? 0.04 : 0.25; p.vx *= p.k === "puffball" ? 0.93 : 0.98; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+      if (p.y > GY - 2 && p.k !== "dust" && p.k !== "puffball") { p.y = GY - 2; p.vy *= -0.3; p.vx *= 0.7; p.vr *= 0.6; }
+    }
     parts = parts.filter(p => p.life < p.max);
-    for (const p of puff) p.life++;
-    puff = puff.filter(p => p.life < 50);
+    for (const p of puff) {
+      p.life++; p.x += p.vx; p.y += p.vy; p.vy += 0.42; p.rot += p.vr;
+      if (p.life === 34) { puffOut(p); }
+    }
+    puff = puff.filter(p => p.life < 34);
     shake *= 0.86; if (shake < 0.3) shake = 0;
   }
   // událost ze simulace nebo záznamu
+  let koTrack = { alive: { x: 3, o: 3 }, last: -99 };
+  function beginAct(bodies) { koTrack = { alive: { x: JP.alive(bodies, "x"), o: JP.alive(bodies, "o") }, last: -99 }; }
+  function nearCritters(x, y, r, f) { for (const s of CS.values()) if (frameN - s.last <= 3 && Math.hypot(s.x - x, s.y - y) < r) f(s); }
   function fx(e, quiet) {
     if (e.type === "h") {
       burst(e.x, e.y, e.m, 3 + e.s * 4, 0.6 + e.s * 0.3);
       if (!quiet) sfx.hit(e.m, e.s);
       if (e.s >= 2 && !calm()) shake = Math.max(shake, 4 + e.s * 3);
+      if (e.s >= 3 && !calm()) freeze = Math.max(freeze, 3);
+      if (e.s >= 2) nearCritters(e.x, e.y, 110, s => { s.startle = Math.max(s.startle, 0.6 + e.s * 0.12); });
     } else if (e.type === "b") {
-      const m = e.m || "w";
-      burst(e.x, e.y, m, 14, 1.2); if (!quiet) sfx.hit(m, 3);
-      if (!calm()) shake = Math.max(shake, 7);
+      fragments(e); if (!quiet) sfx.hit(e.m || "w", 3);
+      if (!calm()) { shake = Math.max(shake, 7); freeze = Math.max(freeze, 2); }
+      nearCritters(e.x, e.y, 130, s => { s.startle = 1; });
     } else if (e.type === "k") {
       koFx(e.x, e.y, e.m === "o" ? "o" : "x"); if (!quiet) sfx.ko(); buzz(30);
-      if (!calm()) shake = Math.max(shake, 9);
+      if (!calm()) { shake = Math.max(shake, 10); freeze = Math.max(freeze, 5); }
+      const team = e.m === "o" ? "o" : "x";
+      koTrack.alive[team]--;
+      const decisive = koTrack.alive[team] <= 0 || e.t - koTrack.last < 45;
+      koTrack.last = e.t;
+      STATS.ko++;
+      if (decisive && !calm()) { slow = { t: 60, f: 0.28 }; STATS.slow++; }
+      CS.delete(e.id);
+      nearCritters(e.x, e.y, 200, s => { s.startle = 1; s.fear = Math.max(s.fear, 0.7); });
+    } else if (e.type === "e") {
+      boomFx(e); if (!quiet) sfx.boom(); buzz(40);
+      if (!calm()) { shake = Math.max(shake, 16); freeze = Math.max(freeze, 4); }
+      nearCritters(e.x, e.y, e.r * 1.6, s => { s.startle = 1; s.fear = Math.max(s.fear, 0.8); });
     } else if (e.type === "n") { if (!quiet) sfx.drop(); }
   }
 
@@ -380,41 +400,38 @@
   let replay = null;        // { acts, i, rp, t, final } – přehrávání soupeřova tahu
   let pendingDoc = null;    // dokument, který přišel během přehrávání
   let aim = null;           // { x0, y0, dx, dy, kb } – napínání praku
-  let ghost = null;         // { k, x, rot } – kostka ve fázi stavby
-  let kbAim = null;
+  let pickSel = null;       // vybraný druh ježka ve fázi výběru
+  let pickAt = 0;           // panel výběru naskočí s krátkým odstupem, ať je vidět reakce postaviček na výstřel
 
   const nameOf = (g, p) => p === "x" ? g.x : g.o;
   const ended = () => !!st && st.ph === "end";
   const myTurn = () => !!st && !!me && st.p === me && !ended();
   const canAim = () => myTurn() && st.ph === "aim" && !acting && !replay && !busy && view === "play";
-  const building = () => myTurn() && st.ph === "build" && !acting && !replay && view === "play" && !!ghost;
+  const picking = () => myTurn() && st.ph === "pick" && !acting && !replay && view === "play";
   const freeSeat = () => !room ? null : !room.sx ? "x" : !room.so ? "o" : null;
   const say = t => { $("say").textContent = ""; requestAnimationFrame(() => $("say").textContent = t); };
 
   function currentHog() {
-    if (acting) { const h = acting.sim.hogView(); return h && { ...h, team: acting.team }; }
-    if (replay && replay.rp) { const h = replay.rp.hogView(replay.t); return h && { ...h, team: replay.acts[replay.i].by }; }
+    if (acting) { const h = acting.rp.hogView(acting.t); return h && { ...h, team: acting.team, type: acting.type }; }
+    if (replay && replay.rp) { const a = replay.acts[replay.i], h = replay.rp.hogView(replay.t); return h && { ...h, team: a.by, type: a.ht || "n" }; }
     return null;
   }
   function scene() {
     let bodies, hog = currentHog();
-    if (acting) bodies = acting.sim.view();
+    if (acting) bodies = acting.rp.view(acting.t);
     else if (replay && replay.rp) bodies = replay.rp.view(replay.t);
     else bodies = st ? st.b.map(b => ({ ...b, max: b.k === "C" ? JP.CRITTER_HP : JP.MAT[KIND[b.k].m].hp })) : JP.initialBodies();
-    const sc = { bodies, hog };
+    const sc = { bodies, hog, hogType: st ? st.hg : "n" };
     if (aim && canAim()) {
       const { ang, pow } = aimParams(aim.dx, aim.dy);
       const s = SLING[me], pullW = pow * 70;
       sc.pull = { team: me, x: s.x - Math.cos(ang) * pullW, y: s.y - Math.sin(ang) * pullW, a: ang };
-      if (pow > 0.08) sc.dots = JP.preview(me, ang, pow, 22, 3);
-    } else if (canAim()) sc.loaded = me;
-    if (building()) {
-      const K = KIND[ghost.k], w = ghost.rot ? K.h : K.w, h = ghost.rot ? K.w : K.h, [z0, z1] = ZONE[me];
-      ghost.x = clamp(ghost.x, z0 + w / 2, z1 - w / 2);
-      let top = JP.PY;
-      for (const b of bodies) { const d = JP.dims(b.k), r = Math.max(d.w, d.h) / 2 + 2; if (Math.abs(b.x - ghost.x) < w / 2 + r) top = Math.min(top, b.y - r); }
-      sc.ghost = { k: ghost.k, x: ghost.x, y: Math.max(80, top - h / 2 - 14), rot: ghost.rot };
-    }
+      if (pow > 0.08) {
+        // náhled jen úvodní oblouk: končí, když by tečka zapadla do terénu
+        const all = JP.preview(me, ang, pow, 16, 3, st.hg), cut = all.findIndex(p => p[1] > groundAt(p[0]) - 6);
+        sc.dots = cut < 0 ? all : all.slice(0, cut);
+      }
+    } else if (st && st.ph === "aim" && !acting && !replay && !ended() && view === "play") sc.loaded = st.p;   // ježek v praku vidí i čekající
     return sc;
   }
 
@@ -423,7 +440,7 @@
   const speed = () => TEST && window.JPT ? window.JPT.speed : 1;
   function frame(now) {
     const dt = Math.min(100, now - last); last = now;
-    accT += dt * speed();
+    accT += dt * speed() * (slow.t > 0 ? slow.f : settling() ? 1.8 : 1);
     let n = 0;
     while (accT >= 1000 / 60 && n < 12) {
       accT -= 1000 / 60; n++;
@@ -433,16 +450,22 @@
     draw();
     requestAnimationFrame(frame);
   }
+  // když doznívá pád a nic se neděje (ježek je pryč, 0,5 s bez události), přehrávání se zrychlí; vizuální, simulace se nemění
+  function settling() {
+    const r = acting && !acting.played ? acting : replay && replay.rp ? replay : null;
+    return !!r && r.wait <= 0 && r.t - (r.lastEv || 0) > 30 && !r.rp.hogView(r.t);
+  }
   function tick() {
-    if (acting && !acting.finished) {
-      acting.sim.step();
-      if (acting.sim.done) { acting.finished = true; finishAct(); }
-    }
+    if (freeze > 0) { freeze--; STATS.freeze++; return; }   // hit-stop: jen vizuální pauza, simulace i záznam stojí
+    if (acting && !acting.played && stepPlay(acting)) { acting.played = true; reactToShot(acting.team, acting.evs); tryFinish(); }
     if (replay) stepReplay();
     stepParticles();
     if (cam.hold > 0 && !currentHog()) cam.hold--;
   }
+  let lastDrawT = performance.now();
   function draw() {
+    const nowT = performance.now(), dtf = clamp((nowT - lastDrawT) / 16.667, 0.3, 3); lastDrawT = nowT;
+    if (slow.t > 0) slow.t -= dtf;
     const g = camGoal();
     if (cam.snap || calm()) { cam.x = g.x; cam.s = g.s; cam.snap = false; }
     else { cam.x += (g.x - cam.x) * 0.09; cam.s += (g.s - cam.s) * 0.08; }
@@ -452,7 +475,9 @@
     bg();
     const [ox, oy] = toScreen(0, 0);
     ctx.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, dpr * (ox + sx), dpr * (oy + sy));
-    drawWorld(scene());
+    const sc = scene();
+    csUpdate(sc.bodies, sc.hog, dtf);
+    drawWorld(sc);
   }
 
   // ---------- míření ----------
@@ -478,14 +503,13 @@
     attempt(() => cv.setPointerCapture(e.pointerId));
     if (ptrs.size === 2) {
       // druhý prst: zoom, rozpracované míření se zruší
-      aim = null; pan = null; if (ghost) ghost.drag = false;
+      aim = null; pan = null;
       const [a, b] = [...ptrs.values()], mx = (a[0] + b[0]) / 2;
       pinch = { d0: Math.max(20, Math.hypot(a[0] - b[0], a[1] - b[1])), s0: cam.s, wx: toWorld(mx, 0)[0] };
       render(); return;
     }
     if (ptrs.size > 2) return;
     if (canAim() && nearSling(x, y)) { aim = { x0: x, y0: y, dx: 0, dy: 0 }; render(); return; }
-    if (building() && inZone(x)) { ghost.x = toWorld(x, 0)[0]; ghost.drag = true; return; }
     pan = { x0: x, cx: cam.x, moved: false };
     cv.classList.add("pan");
   });
@@ -502,8 +526,7 @@
       aim.dx = x - aim.x0; aim.dy = y - aim.y0;
       const { pow } = aimParams(aim.dx, aim.dy);
       sfx.stretch(pow); showMeter();
-    } else if (ghost && ghost.drag && building()) ghost.x = toWorld(x, 0)[0];
-    else if (pan) {
+    } else if (pan) {
       if (Math.abs(x - pan.x0) > 4) pan.moved = true;
       if (pan.moved) setUserCam(pan.cx - (x - pan.x0) / cam.s, cam.s);
     }
@@ -517,7 +540,7 @@
   function up(e, fire) {
     ptrs.delete(e.pointerId);
     if (pinch) { if (ptrs.size < 2) pinch = null; return; }
-    endAim(fire); if (ghost) ghost.drag = false;
+    endAim(fire);
     pan = null; cv.classList.remove("pan");
   }
   cv.addEventListener("pointerup", e => up(e, true));
@@ -546,11 +569,10 @@
       else if (e.key === "Escape") { aim = null; render(); return; }
       else used = false;
       if (used) { e.preventDefault(); aim.dx = -Math.cos(A) * P * maxPull(); aim.dy = -Math.sin(A) * P * maxPull(); showMeter(); }
-    } else if (building()) {
-      if (e.key === "ArrowLeft") { ghost.x -= 10; e.preventDefault(); }
-      else if (e.key === "ArrowRight") { ghost.x += 10; e.preventDefault(); }
-      else if (e.key === "r" || e.key === "R") rotate();
-      else if (e.key === " " || e.key === "Enter") { e.preventDefault(); dropBlock(); }
+    } else if (picking()) {
+      if (e.key === "ArrowLeft") { pickMove(-1); e.preventDefault(); }
+      else if (e.key === "ArrowRight") { pickMove(1); e.preventDefault(); }
+      else if (e.key === " " || e.key === "Enter") { e.preventDefault(); sendHog(); }
     }
   });
   function showMeter() {
@@ -562,43 +584,62 @@
   }
 
   // ---------- výstřel a stavba (u mě) ----------
+  // Střelec simuluje výstřel hned celý (rychle, bez čekání na animaci), zápis odešle okamžitě a vlastní tah si přehraje
+  // ze stejných snímků jako soupeř. Soupeř tak nečeká, až střelcovi doběhne animace.
   function shoot(ang, pow) {
     const base = st;
-    const sim = JP.sim(base.b, { onEvent: e => fx(e) });
-    sim.launch(me, ang, pow);
+    beginAct(base.b);
+    const sim = JP.sim(base.b);
+    sim.launch(me, ang, pow, base.hg);
+    while (sim.step());
+    const res = sim.result(28000);
+    const next = { ...base, b: res.bodies, n: base.n + 1, t: Math.floor(Date.now() / 60000) };
+    const act = { n: next.n, by: me, kind: "s", kf: res.kf, ev: res.ev, b0: JP.packBodies(base.b), a: Math.round(ang * 1000), f: Math.round(pow * 1000), ht: base.hg };
+    next.h = [act];
+    const opp = other(me), mine = JP.alive(res.bodies, me), theirs = JP.alive(res.bodies, opp);
+    if (theirs === 0) { next.ph = "end"; next.win = me; }
+    else if (mine === 0) { next.ph = "end"; next.win = opp; }
+    else if (base.pl[opp].length === 1) { next.ph = "aim"; next.p = opp; next.hg = base.pl[opp]; next.pl = giveHog(base, opp, next.hg); }
+    else { next.ph = "pick"; next.p = me; }
+    acting = { team: me, type: base.hg, base, next, evs: JP.decEvents(res.ev), rp: JP.replay(base.b, res.kf, res.ev), t: 0, evI: 0, wait: 4, played: false, ok: null };
     sfx.launch(); buzz(20);
-    acting = { sim, kind: "s", team: me, base, a: Math.round(ang * 1000), f: Math.round(pow * 1000) };
     $("meter").hidden = true;
     say("Výstřel!");
+    const A = acting;
+    commit(next, cur => cur.id === base.id && cur.n === base.n && cur.p === me && cur.ph === base.ph && !cur.r, "", base).then(ok => { A.ok = ok; tryFinish(); });
     render();
   }
-  function dropBlock() {
-    if (!building()) return;
-    const base = st, g = ghost;
-    const sim = JP.sim(base.b, { onEvent: e => fx(e) });
-    sim.drop(me, g.k, g.x, g.rot);
-    acting = { sim, kind: "b", team: me, base, kk: g.k, bx: Math.round(g.x), rot: g.rot ? 1 : 0 };
-    ghost = null;
-    render();
-  }
-  async function finishAct() {
-    const A = acting, base = A.base, res = A.sim.result(A.kind === "s" ? 28000 : 8000);
-    const next = { ...base, b: res.bodies, n: base.n + 1, t: Math.floor(Date.now() / 60000) };
-    const act = { n: next.n, by: me, kind: A.kind, kf: res.kf, ev: res.ev, b0: JP.packBodies(base.b) };
-    if (A.kind === "s") Object.assign(act, { a: A.a, f: A.f }); else Object.assign(act, { kk: A.kk, bx: A.bx, rot: A.rot });
-    next.h = A.kind === "s" ? [act] : [...(base.h || []).filter(a => a.n === base.n && a.kind === "s"), act];
-    const mine = JP.alive(res.bodies, me), theirs = JP.alive(res.bodies, other(me));
-    if (theirs === 0) { next.ph = "end"; next.win = me; }
-    else if (mine === 0) { next.ph = "end"; next.win = other(me); }
-    else if (A.kind === "s") { next.ph = "build"; next.p = me; }
-    else { next.ph = "aim"; next.p = other(me); }
-    const ok = await commit(next, cur => cur.id === base.id && cur.n === base.n && cur.p === me && cur.ph === base.ph && !cur.r, "", base);
+  function tryFinish() {
+    const A = acting;
+    if (!A || !A.played || A.ok === null) return;
     acting = null;
-    if (!ok) { render(); return; }
-    setGame(next);
+    if (!A.ok) { render(); return; }
+    setGame(A.next);
+    pickAt = performance.now() + (calm() ? 250 : 700);
     afterChange(true);
   }
-  function rotate() { if (ghost) { ghost.rot = !ghost.rot; renderKinds(); } }
+  // dávkování ježků: soupeř dostane každý druh jednou, než se dávka obnoví (poslední zbývající přijde sám)
+  function giveHog(g, to, type) {
+    let rest = g.pl[to].replace(type, "");
+    if (!rest) rest = JP.HOG_ORDER.replace(type, "");
+    return { ...g.pl, [to]: rest };
+  }
+  // ježek pro soupeře: vyber druh a pošli
+  const pool = () => st && me ? st.pl[other(me)] : "";
+  function pickMove(d) {
+    const p = pool(); if (!p || !pickSel) return;
+    const i = JP.HOG_ORDER.split("").filter(c => p.includes(c)), k = (i.indexOf(pickSel) + d + i.length) % i.length;
+    pickSel = i[k]; renderPick();
+  }
+  async function sendHog() {
+    if (!picking() || !pickSel || busy || !pool().includes(pickSel)) return;
+    const base = st, opp = other(me), hg = pickSel;
+    const next = { ...base, ph: "aim", p: opp, hg, pl: giveHog(base, opp, hg) };
+    const ok = await commit(next, cur => cur.id === base.id && cur.n === base.n && cur.p === me && cur.ph === "pick" && !cur.r, "", base);
+    if (!ok) { render(); return; }
+    sfx.pick(); setGame(next); afterChange(false);
+    say(`${nameOf(next, opp)} dostane: ${HOGUI[hg][0]} ježek.`);
+  }
 
   // ---------- přehrávání soupeřova tahu ----------
   function startReplay(acts, final) {
@@ -606,23 +647,27 @@
     nextReplay();
   }
   function nextReplay() {
+    const prev = replay.acts[replay.i];
+    if (prev && prev.kind === "s" && replay.rp) reactToShot(prev.by, replay.rp.events);
     replay.i++;
     const a = replay.acts[replay.i];
     if (!a) { const f = replay.final; replay = null; setGame(f); afterChange(true); if (pendingDoc) { const d = pendingDoc; pendingDoc = null; apply(d, true); } return; }
     const b0 = JP.unpackBodies(a.b0) || st.b;
+    beginAct(b0);
     replay.rp = JP.replay(b0, a.kf, a.ev);
-    replay.t = 0; replay.evI = 0; replay.wait = a.kind === "s" ? 50 : 15;
+    replay.t = 0; replay.evI = 0; replay.wait = a.kind === "s" ? 30 : 12;
     if (a.kind === "s") { sfx.launch(); say(`${nameOf(replay.final, a.by)} střílí.`); }
     render();
   }
-  function stepReplay() {
-    const r = replay;
-    if (r.wait > 0) { r.wait--; return; }
+  // jeden krok přehrávání (soupeřův tah i vlastní tah střelce); vrací true, když doběhlo
+  function stepPlay(r) {
+    if (r.wait > 0) { r.wait--; return false; }
     r.t++;
     const evs = r.rp.events;
-    while (r.evI < evs.length && evs[r.evI].t <= r.t) fx(evs[r.evI++]);
-    if (r.t > r.rp.end + 40) nextReplay();
+    while (r.evI < evs.length && evs[r.evI].t <= r.t) { fx(evs[r.evI++]); r.lastEv = r.t; }
+    return r.t > r.rp.end + 28;
   }
+  function stepReplay() { if (stepPlay(replay)) nextReplay(); }
 
   // ---------- sdílená místnost (jako Psaníčko: mantledb.sh, bez účtu) ----------
   // Odkaz #r.<id>. Dokument {app, g, v, sx, so, u}: v = počítadlo zápisů, sx / so = zařízení na židlích.
@@ -655,18 +700,26 @@
     if (!g || typeof g !== "object") return null;
     const str = (v, n) => typeof v === "string" ? v.trim().slice(0, n) : "";
     const x = str(g.x, 16), o = str(g.o, 16), b = JP.unpackBodies(g.b);
-    if (!x || !o || !b || (g.s !== "x" && g.s !== "o") || (g.p !== "x" && g.p !== "o") || !["aim", "build", "end"].includes(g.ph)) return null;
+    if (!x || !o || !b || (g.s !== "x" && g.s !== "o") || (g.p !== "x" && g.p !== "o") || !["aim", "build", "pick", "end"].includes(g.ph)) return null;
     const w = Array.isArray(g.w) ? [0, 1].map(k => Math.max(0, Math.min(999, g.w[k] | 0))) : [0, 0];
     const k = /^[1-6c]$/.test(g.k || "") ? g.k : "", kc = str(g.kc, 40);
-    const h = (Array.isArray(g.h) ? g.h : []).filter(a => a && Number.isFinite(a.n) && (a.by === "x" || a.by === "o") && (a.kind === "s" || a.kind === "b") && typeof a.kf === "string").slice(-2);
+    const hogOk = c => typeof c === "string" && c.length === 1 && JP.HOG_ORDER.includes(c);
+    const h = (Array.isArray(g.h) ? g.h : []).filter(a => a && Number.isFinite(a.n) && (a.by === "x" || a.by === "o") && (a.kind === "s" || a.kind === "b") && typeof a.kf === "string").slice(-2).map(a => ({ ...a, ht: hogOk(a.ht) ? a.ht : "n" }));
+    // ježci (twist): hg = druh ježka, kterého teď střílí hráč na tahu; pl = které druhy ještě může každý dostat. Starší hry je nemají.
+    const poolOk = v => typeof v === "string" && v.length > 0 && v.length <= 4 && [...v].every(c => JP.HOG_ORDER.includes(c)) && new Set(v).size === v.length ? v : JP.HOG_ORDER;
+    const pl = { x: poolOk(g.pl && g.pl.x), o: poolOk(g.pl && g.pl.o) };
+    let ph = g.ph, p = g.p;
+    if (ph === "build") { ph = "aim"; p = other(p); }   // rozehraná hra ze starší verze (stavba kostek): stavba odpadá, na tahu je soupeř
     return { id: str(g.id, 12) || "0", x, o, s: g.s, k: k === "c" && !kc ? "" : k, kc, w, r: g.r === "x" || g.r === "o" ? g.r : "",
-      n: Math.max(0, g.n | 0), p: g.p, ph: g.ph, win: g.win === "x" || g.win === "o" ? g.win : "", b, h, t: Number.isFinite(g.t) ? g.t : null };
+      n: Math.max(0, g.n | 0), p, ph, win: g.win === "x" || g.win === "o" ? g.win : "", b, h, hg: hogOk(g.hg) ? g.hg : "n", pl, t: Number.isFinite(g.t) ? g.t : null };
   }
   function freshGame(x, o, s, k, kc, w) {
-    return { id: randId(6), x, o, s, k, kc, w, r: "", n: 0, p: s, ph: "aim", win: "", b: JP.initialBodies(), h: [], t: null };
+    // první střelec začíná obyčejným ježkem, ostatní druhy dostane později
+    const pl = { x: s === "x" ? "kgb" : JP.HOG_ORDER, o: s === "o" ? "kgb" : JP.HOG_ORDER };
+    return { id: randId(6), x, o, s, k, kc, w, r: "", n: 0, p: s, ph: "aim", win: "", b: JP.initialBodies(), h: [], hg: "n", pl, t: null };
   }
   const setGame = g => { st = g; };
-  const sig = g => g ? [g.id, g.x, g.o, g.s, g.n, g.p, g.ph, g.w.join(":"), g.r, g.k, g.kc].join("|") : "";
+  const sig = g => g ? [g.id, g.x, g.o, g.s, g.n, g.p, g.ph, g.w.join(":"), g.r, g.k, g.kc, g.hg, g.pl.x, g.pl.o].join("|") : "";
 
   async function commit(next, ok, conflictText, base = st) {
     busy = true; pollSeq++; render();
@@ -707,14 +760,13 @@
     }
     const newGame = !prev || g.id !== prev.id;
     setGame(g);
-    if (newGame) { parts = []; puff = []; cam.snap = true; cam.user = null; }
+    if (newGame) { parts = []; puff = []; CS.clear(); cam.snap = true; cam.user = null; }
     afterChange(newGame);
   }
   // po změně stavu: stavba, oznámení, konec
   function afterChange(fresh) {
     if (fresh || (myTurn() && !acting)) { cam.user = null; syncView(); }
-    if (myTurn() && st.ph === "build" && !ghost) ghost = { k: store.get("jp-kind") || "sB", x: me === "x" ? 260 : W - 260, rot: false };
-    if (!myTurn() || st.ph !== "build") ghost = null;
+    if (picking()) { const p = pool(); if (!pickSel || !p.includes(pickSel)) pickSel = p[0]; }
     if (ended()) {
       const won = st.win === me;
       if (fresh && me) { won ? sfx.win() : sfx.lose(); }
@@ -728,7 +780,7 @@
   let pollT = null, pollSeq = 0, lastChange = Date.now(), fails = 0;
   function interval() {
     const idle = Date.now() - lastChange;
-    const ms = idle < 5 * 60e3 ? 2500 : idle < 30 * 60e3 ? 10000 : 30000;
+    const ms = idle < 90e3 ? 1500 : idle < 5 * 60e3 ? 2500 : idle < 30 * 60e3 ? 10000 : 30000;   // při živé hře rychleji, ať soupeř nečeká
     return fails ? Math.min(60000, ms * 2 ** Math.min(fails, 4)) : ms;
   }
   function schedule(ms) { clearTimeout(pollT); pollT = setTimeout(poll, ms); }
@@ -792,7 +844,7 @@
     const key = team + alive;
     if (!lifeCache[key]) {
       const c = document.createElement("canvas"); c.width = c.height = 64;
-      const x = c.getContext("2d"); x.translate(32, 36); x.scale(1.3, 1.3); drawCritter(x, team, 2.6, 0, team === "x" ? 1 : -1, !alive);
+      const x = c.getContext("2d"); x.translate(32, 36); x.scale(1.22, 1.22); drawCritter(x, team, 2.4, { lookX: team === "x" ? 1 : -1, ko: !alive, hurt: alive ? 0 : 1, plain: true, still: true });
       lifeCache[key] = c.toDataURL();
     }
     return lifeCache[key];
@@ -822,51 +874,77 @@
     const opp = me ? other(me) : null;
     if (net) s = net;
     else if (ended() && !replay) s = "";
-    else if (acting) s = acting.kind === "s" ? "Letí!" : "Kostka padá…";
+    else if (acting) s = acting.played ? "Odesílám…" : "Letí!";
     else if (replay) { const a = replay.acts[replay.i]; s = a ? (a.kind === "s" ? `${nameOf(st, a.by)} střílí!` : `${nameOf(st, a.by)} staví…`) : ""; }
     else if (busy) s = "Odesílám…";
     else if (myTurn() && st.ph === "aim") { s = "Jsi na tahu: natáhni prak"; waitStyle = false; pulse = true; }
-    else if (myTurn() && st.ph === "build") { s = "Přidej si kostku"; waitStyle = false; }
-    else s = st.ph === "build" ? `${nameOf(st, st.p)} staví…` : `${nameOf(st, st.p)} míří…`;
+    else if (myTurn() && st.ph === "pick") { s = "Vyber ježka pro soupeře"; waitStyle = false; }
+    else s = st.ph === "pick" ? (me && me !== st.p ? `${nameOf(st, st.p)} ti vybírá ježka…` : `${nameOf(st, st.p)} vybírá ježka…`) : `${nameOf(st, st.p)} míří…`;
     $("status").textContent = s; $("status").hidden = !s;
     $("status").classList.toggle("wait", waitStyle); $("status").classList.toggle("pulse", pulse && !calm());
     const waiting = !!me && !!freeSeat() && !ended();
-    $("waitBox").hidden = !waiting || canAim() || building() || !!acting || !!aim;
+    $("waitBox").hidden = !waiting || canAim() || picking() || !!acting || !!aim;
     if (waiting) $("waitText").textContent = `${nameOf(st, opp)} ještě neotevřel(a) výzvu. Pošli odkaz do chatu.`;
     $("hint").hidden = !canAim() || !!aim || !$("waitBox").hidden;
-    $("hint").textContent = "Chyť ježka v praku, táhni dozadu a pusť. Jinde tažením posouváš scénu.";
+    $("hint").textContent = "Chyť ježka v praku, táhni dozadu a pusť. Jinde tažením posouváš scénu." + (portrait() ? " Na šířku je scéna větší." : "");
     if (!aim) $("meter").hidden = true;
-    $("buildBox").hidden = !building();
-    if (building()) renderKinds();
-    cv.classList.toggle("aim", canAim() && !aim); cv.classList.toggle("aiming", !!aim); cv.classList.toggle("build", building());
+    const showPick = picking() && performance.now() >= pickAt;
+    if (picking() && !showPick) setTimeout(render, pickAt - performance.now() + 30);
+    $("pickBox").hidden = !showPick;
+    if (showPick) renderPick();
+    // ježek na tahu: vidí ho střelec i čekající
+    const chip = st.ph === "aim" && !ended() && !acting && !replay;
+    $("hogChip").hidden = !chip;
+    if (chip) {
+      const [nm, inf] = HOGUI[st.hg], mine = myTurn();
+      $("hcIcon").src = hogIcon(st.hg);
+      $("hcName").textContent = `${nm} ježek`;
+      $("hcInfo").textContent = mine ? (st.n === 0 ? `První výstřel. ${inf}` : `Vybral ti ho ${nameOf(st, other(st.p))}. ${inf}`) : `${nameOf(st, st.p)} střílí. ${inf}`;
+    }
+    cv.classList.toggle("aim", canAim() && !aim); cv.classList.toggle("aiming", !!aim);
     // konec
     const showEnd = ended() && !replay && !acting;
     $("endBox").hidden = !showEnd;
     if (showEnd) renderEnd();
-    document.title = canAim() ? "Jsi na tahu · Ježkomet" : building() ? "Stavíš · Ježkomet" : ended() && !replay ? "Konec partie · Ježkomet" : "Ježkomet";
+    document.title = canAim() ? "Jsi na tahu · Ježkomet" : picking() ? "Vybíráš ježka · Ježkomet" : ended() && !replay ? "Konec partie · Ježkomet" : "Ježkomet";
   }
-  const KIND_UI = { wP: ["Prkno", "dřevo"], sB: ["Kvádr", "kámen"], gP: ["Sloupek", "sklo"] };
-  function renderKinds() {
-    const box = $("kinds");
+  // druhy ježků: název a jedna věta o tom, co umí
+  const HOGUI = { n: ["Obyčejný", "Poctivá rána."], k: ["Kamenný", "Těžký: boří, ale letí kratší."], g: ["Gumový", "Skáče a odráží se od všeho."], b: ["Bouchací", "Při dopadu vybuchne."] };
+  const hogIcons = {};
+  function hogIcon(type) {
+    if (!hogIcons[type]) {
+      const c = document.createElement("canvas"); c.width = c.height = 96;
+      const x = c.getContext("2d"); x.translate(48, 52); x.scale(1.5, 1.5); drawHog(x, "x", 2.2, type, { t: 1 });
+      hogIcons[type] = c.toDataURL();
+    }
+    return hogIcons[type];
+  }
+  function renderPick() {
+    const box = $("kinds"), p = pool();
     if (!box.dataset.ready) {
       box.dataset.ready = "1";
-      for (const k of JP.BUILD) {
+      for (const k of JP.HOG_ORDER) {
         const b = document.createElement("button"); b.type = "button"; b.className = "btn kind"; b.dataset.k = k;
-        const c = document.createElement("canvas"); c.width = 140; c.height = 60;
-        const x = c.getContext("2d"); const K = KIND[k]; const sc = Math.min(1, 120 / Math.max(K.w, K.h), 48 / Math.min(K.w, K.h) );
-        x.translate(70, 30); x.scale(sc * 0.9, sc * 0.9); if (K.h > K.w) x.rotate(Math.PI / 2); drawBlock(x, k, 3 / sc, 0, 2);
-        b.append(c, document.createTextNode(KIND_UI[k][0]));
-        const sm = document.createElement("small"); sm.textContent = KIND_UI[k][1]; b.append(sm);
-        b.addEventListener("click", () => { if (ghost) { ghost.k = k; store.set("jp-kind", k); renderKinds(); } });
+        const im = new Image(); im.src = hogIcon(k); im.alt = ""; im.width = im.height = 48;
+        const nm = document.createElement("span"); nm.className = "kn"; nm.textContent = HOGUI[k][0];
+        const sm = document.createElement("small"); sm.className = "ki"; sm.textContent = HOGUI[k][1];
+        const tx = document.createElement("span"); tx.className = "kt"; tx.append(nm, sm);
+        b.append(im, tx);
+        b.addEventListener("click", () => { if (picking() && pool().includes(k)) { pickSel = k; sfx.stretch(0.3); renderPick(); } });
         box.appendChild(b);
       }
     }
-    for (const b of box.querySelectorAll("[data-k]")) b.setAttribute("aria-pressed", String(!!ghost && ghost.k === b.dataset.k));
-    $("rotBtn").setAttribute("aria-pressed", String(!!ghost && ghost.rot));
-    $("dropBtn").disabled = busy;
+    for (const b of box.querySelectorAll("[data-k]")) {
+      const k = b.dataset.k, used = !p.includes(k);
+      b.disabled = used; b.setAttribute("aria-pressed", String(pickSel === k));
+      b.querySelector(".ki").textContent = used ? "Už dostal(a), počkej na další dávku." : HOGUI[k][1];
+    }
+    $("pickTitle").textContent = `Jakého ježka dostane soupeř (${nameOf(st, other(me))})?`;
+    $("pickNote").textContent = `Každý druh dostane jednou, než se dávka obnoví. Zbývá ${p.length} z 4.`;
+    $("sendBtn").disabled = busy || !pickSel || !p.includes(pickSel);
+    $("sendBtn").textContent = pickSel ? `Poslat: ${HOGUI[pickSel][0]} ježek` : "Poslat ježka";
   }
-  $("dropBtn").addEventListener("click", dropBlock);
-  $("rotBtn").addEventListener("click", rotate);
+  $("sendBtn").addEventListener("click", sendHog);
 
   function renderEnd() {
     const won = me && st.win === me, s = stake(st), W_ = nameOf(st, st.win), L = nameOf(st, other(st.win));
@@ -879,7 +957,7 @@
     $("endPrimary").hidden = !me; $("endPrimary").disabled = busy;
     if (!me) $("endSecondary").textContent = "Zkopírovat odkaz na hru";
     else if (won) { $("endPrimary").textContent = `Odveta (začíná ${loser})`; $("endSecondary").textContent = "Zkopírovat odkaz na hru"; }
-    else { $("endPrimary").textContent = "Chci odvetu"; $("endSecondary").textContent = "Uznat porážku (zkopíruje zprávu)"; }
+    else { $("endPrimary").textContent = "Chci odvetu"; $("endSecondary").textContent = "Uznat porážku"; }
   }
   function renderShare() {
     $("shareName").textContent = nameOf(st, other(me || "x"));
@@ -900,8 +978,8 @@
     if (el.childElementCount) return;
     for (const [t, hog] of [["x", false], [null, true], ["o", false]]) {
       const c = document.createElement("canvas"); c.width = c.height = 128;
-      const x = c.getContext("2d"); x.translate(64, 70); x.scale(2.3, 2.3);
-      hog ? drawHog(x, "x", 2.4) : drawCritter(x, t, 2.4, 0, t === "x" ? 1 : -1);
+      const x = c.getContext("2d"); x.translate(64, 68); x.scale(2.2, 2.2);
+      hog ? drawHog(x, "x", 2.2, "n", { t: 1 }) : drawCritter(x, t, 2.2, { lookX: t === "x" ? 0.6 : -0.6, still: true, plain: true });
       el.appendChild(c);
     }
   }
@@ -912,7 +990,7 @@
     const loser = other(st.win);
     const next = freshGame(st.x, st.o, loser, st.k, st.kc, seriesAfter());
     if (!await commit(next, cur => cur.id === st.id && cur.ph === "end", "Odvetu už mezitím založil soupeř.")) return;
-    setGame(next); parts = []; puff = []; cam.snap = true;
+    setGame(next); parts = []; puff = []; CS.clear(); cam.snap = true;
     afterChange(true);
     say(`Odveta. Začíná ${nameOf(next, next.s)}.`);
   }
@@ -1027,7 +1105,7 @@
   }
   function newGame() {
     clearTimeout(pollT); bootSeq++;
-    room = null; me = null; st = null; busy = false; net = ""; acting = null; replay = null; ghost = null; aim = null;
+    room = null; me = null; st = null; busy = false; net = ""; acting = null; replay = null; pickSel = null; aim = null; CS.clear(); parts = []; puff = [];
     history.pushState(null, "", location.pathname + location.search);
     showSetup();
   }
@@ -1090,7 +1168,7 @@
   function boot() {
     const seq = ++bootSeq;
     clearTimeout(pollT);
-    room = null; me = null; busy = false; net = ""; fails = 0; acting = null; replay = null; ghost = null; aim = null;
+    room = null; me = null; busy = false; net = ""; fails = 0; acting = null; replay = null; pickSel = null; aim = null;
     const h = (location.hash || "").replace(/^#/, "");
     const r = /^r\.([0-9a-z]{6,24})$/.exec(h);
     if (r) { openRoom(r[1], seq); return; }
@@ -1102,8 +1180,10 @@
     window.JPT = {
       speed: 1,
       cam: () => ({ x: cam.x, s: cam.s, user: !!cam.user, full: overview(), fs: !!fsEl(), fsOK }),
+      stats: STATS, calm,
+      crit: () => [...CS.values()].filter(s => frameN - s.last <= 3).map(s => ({ t: s.t, fear: +s.fear.toFixed(2), hit: +s.hit.toFixed(2), cheer: +s.cheer.toFixed(2), sad: +s.sad.toFixed(2), startle: +s.startle.toFixed(2) })),
       sling: () => { const [x, y] = toScreen(SLING[me].x, SLING[me].y); const r = cv.getBoundingClientRect(); return [r.left + x, r.top + y]; },
-      info: () => st && { ph: st.ph, p: st.p, n: st.n, me, win: st.win, acting: !!acting, replay: !!replay, busy, alive: { x: JP.alive(st.b, "x"), o: JP.alive(st.b, "o") }, w: st.w, view },
+      info: () => st && { ph: st.ph, p: st.p, n: st.n, hg: st.hg, pl: st.pl, picking: picking(), pickSel, slow: slow.t > 0, me, win: st.win, acting: !!acting, replay: !!replay, busy, alive: { x: JP.alive(st.b, "x"), o: JP.alive(st.b, "o") }, w: st.w, view },
       // nejlepší výstřel z mřížky: vrací tah myší v pixelech (dx, dy), který dá přesně simulovaný úhel a sílu
       best(maxMs = 8000) {
         const t0 = performance.now(), mp = maxPull(), opp = other(me);
@@ -1116,7 +1196,7 @@
           const ang = me === "x" ? -deg * Math.PI / 180 : -Math.PI + deg * Math.PI / 180;
           const dx = Math.round(-Math.cos(ang) * p * mp), dy = Math.round(-Math.sin(ang) * p * mp);
           const q = aimParams(dx, dy);
-          const s = JP.sim(st.b); s.launch(me, q.ang, q.pow); while (s.step());
+          const s = JP.sim(st.b); s.launch(me, q.ang, q.pow, st.hg); while (s.step());
           const r = s.result();
           const score = (3 - JP.alive(r.bodies, opp)) * 10 - (3 - JP.alive(r.bodies, me)) * 15 + JP.alive(st.b, opp) - JP.alive(r.bodies, opp);
           if (!best || score > best.score) best = { dx, dy, score, ko: JP.alive(st.b, opp) - JP.alive(r.bodies, opp) };

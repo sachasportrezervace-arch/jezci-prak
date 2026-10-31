@@ -4,3 +4,7 @@ tests/shots/
 tests/shots-live/
 tests/shots-r3/
 tests/*-sheet.png
+tests/out/
+tests/shots-play*/
+tests/shots-r2/
+tests/shots-review/
