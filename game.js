@@ -65,55 +65,50 @@
   };
   const buzz = ms => attempt(() => navigator.vibrate && navigator.vibrate(ms || 12));
 
-  // ---------- plátno a kamera ----------
+  // ---------- plátno a kamera (camera.js: rozvržení, pohyb, ruční ovládání) ----------
   const cv = $("stage"), ctx = cv.getContext("2d");
   let cw = 0, ch = 0, dpr = 1;
+  const cam = JPCam.create({ W, GY, SLING, ZONE, CR: JP.CR });
   function resize() {
     dpr = Math.min(2, window.devicePixelRatio || 1);
     cw = innerWidth; ch = innerHeight;
     cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
-    cam.snap = true;
-    if (cam.user) cam.user = clampCam(cam.user.x, cam.user.s);
+    cam.resize(cw, ch);
     if ($("viewLbl")) syncView();
   }
-  // user = ruční kamera (posun, zoom), null = automatická
-  const cam = { x: W / 2, s: 0.5, snap: true, hold: 0, holdX: W / 2, user: null };
-  const portrait = () => ch > cw * 1.1;
-  const overview = () => Math.min(cw / 1440, (ch - 80) / 640);     // celá scéna
-  const minS = () => overview() * 0.9, maxS = () => Math.max(overview() * 3.2, 1.2);
-  // y světa GY+70 leží na této výšce obrazovky
-  const anchorY = () => portrait() ? Math.min(ch - 40, ch * 0.8 + cam.s * 70) : ch;   // zem asi v 78 % výšky
-  function clampCam(x, s) {
-    s = clamp(s, minS(), maxS());
-    const half = cw / (2 * s);
-    x = half * 2 >= W + 160 ? W / 2 : clamp(x, -80 + half, W + 80 - half);
-    return { x, s };
+  const portrait = () => cam.portrait();
+  const overview = () => cam.overview();
+  const toScreen = (x, y) => cam.toScreen(x, y), toWorld = (sx, sy) => cam.toWorld(sx, sy);
+  // čí pevnost se ukazuje, když nic nelétá: při míření pevnost střelce, při výběru ježka a po konci ta, do které se střílelo
+  function viewTeam() {
+    if (!st) return me || "x";
+    if (st.ph === "end") return st.win ? other(st.win) : (me || st.p);
+    return st.ph === "pick" ? other(st.p) : st.p;
   }
-  function setUserCam(x, s) { if (!Number.isFinite(x) || !Number.isFinite(s)) return; const c = clampCam(x, s); cam.user = c; cam.x = c.x; cam.s = c.s; syncView(); }
-  // výchozí pohled: na desktopu a na šířku celá scéna, na výšku přiblížená vlastní strana
-  function autoView() {
-    const ov = overview();
-    if (portrait()) return { x: W / 2, s: Math.max(ov, cw / 1180) };   // obě pevnosti (bez okrajů podstavců) přes celou šířku
-    return { x: W / 2, s: ov };
-  }
-  const fullNow = () => !(cam.user && cam.user.s > autoView().s * 1.05);   // není přiblíženo víc než výchozí záběr
   function syncView() {
-    const full = fullNow();
-    $("viewPlus").toggleAttribute("hidden", !full);
-    const l = full ? "Přiblížit" : "Celá scéna"; $("viewLbl").textContent = l; $("viewBtn").setAttribute("aria-label", l);
+    const bt = cam.button(viewTeam());
+    $("viewPlus").toggleAttribute("hidden", !bt.plus);
+    $("viewLbl").textContent = bt.label; $("viewBtn").setAttribute("aria-label", bt.label);
   }
-  const toScreen = (x, y) => [cw / 2 + (x - cam.x) * cam.s, anchorY() + (y - GY - 70) * cam.s];
-  const toWorld = (sx, sy) => [cam.x + (sx - cw / 2) / cam.s, GY + 70 + (sy - anchorY()) / cam.s];
-  function camGoal() {
-    const ov = overview();
-    let s = ov, x = W / 2;
-    const h = currentHog();
-    const zoomS = Math.max(ov, Math.min(cw / 900, (ch - 60) / 560));
-    if (h) { s = zoomS; x = h.x; cam.holdX = h.x; cam.hold = 75; }
-    else if (cam.hold > 0) { s = zoomS; x = cam.holdX; }
-    else if (cam.user) return clampCam(cam.user.x, cam.user.s);
-    else return clampCam(autoView().x, autoView().s);
-    return clampCam(x, s);
+  // probíhající výstřel (můj nebo soupeřův): { team, r }
+  function shotCtx() {
+    if (acting) return { team: acting.team, r: acting };
+    if (replay && replay.rp) { const a = replay.acts[replay.i]; if (a && a.kind === "s") return { team: a.by, r: replay }; }
+    return null;
+  }
+  // co má kamera právě sledovat: výchozí pohled, nebo výstřel s ježkem (poloha a rychlost ve světě za sekundu)
+  function camIntent() {
+    const intent = { rest: cam.restView(viewTeam()), reduced: calm(), shot: null };
+    const S = shotCtx();
+    if (!S) return intent;
+    const r = S.r, h = currentHog();
+    let hog = null;
+    if (h) {
+      const ts = (slow.t > 0 ? slow.f : 1) * speed(), h1 = r.wait > 0 ? null : r.rp.hogView(r.t + 1);
+      hog = { x: h.x, y: h.y, vx: h1 ? (h1.x - h.x) * 60 * ts : 0, vy: h1 ? (h1.y - h.y) * 60 * ts : 0 };
+    }
+    intent.shot = { team: S.team, waiting: r.wait > 0, hog };
+    return intent;
   }
 
   // ---------- pozadí: klidné, ať nepřebíjí hru (bez slunce, mraků a přechodů) ----------
@@ -364,31 +359,39 @@
   let koTrack = { alive: { x: 3, o: 3 }, last: -99 };
   function beginAct(bodies) { koTrack = { alive: { x: JP.alive(bodies, "x"), o: JP.alive(bodies, "o") }, last: -99 }; }
   function nearCritters(x, y, r, f) { for (const s of CS.values()) if (frameN - s.last <= 3 && Math.hypot(s.x - x, s.y - y) < r) f(s); }
+  // hit-stop, zpomalení a záškub kamery při nárazu na jednom místě (jen vykreslení; simulace i záznam se nemění)
+  //   freezeTicks: pauza ve snímcích, slowT/slowF: délka (snímky) a rychlost zpomalení, kick: záškub kamery 0..1
+  function hitStop(freezeTicks, slowT, slowF, kick) {
+    if (calm()) return;
+    freeze = Math.max(freeze, freezeTicks);
+    if (slowT) slow = slow.t > 0 ? { t: Math.max(slow.t, slowT), f: Math.min(slow.f, slowF) } : { t: slowT, f: slowF };
+    cam.impact(kick);
+  }
   function fx(e, quiet) {
     if (e.type === "h") {
       burst(e.x, e.y, e.m, 3 + e.s * 4, 0.6 + e.s * 0.3);
       if (!quiet) sfx.hit(e.m, e.s);
       if (e.s >= 2 && !calm()) shake = Math.max(shake, 4 + e.s * 3);
-      if (e.s >= 3 && !calm()) freeze = Math.max(freeze, 3);
+      if (e.s >= 3) hitStop(3, 14, 0.5, 0.5);
       if (e.s >= 2) nearCritters(e.x, e.y, 110, s => { s.startle = Math.max(s.startle, 0.6 + e.s * 0.12); });
     } else if (e.type === "b") {
       fragments(e); if (!quiet) sfx.hit(e.m || "w", 3);
-      if (!calm()) { shake = Math.max(shake, 7); freeze = Math.max(freeze, 2); }
+      if (!calm()) { shake = Math.max(shake, 7); hitStop(2, 0, 1, 0.3); }
       nearCritters(e.x, e.y, 130, s => { s.startle = 1; });
     } else if (e.type === "k") {
       koFx(e.x, e.y, e.m === "o" ? "o" : "x"); if (!quiet) sfx.ko(); buzz(30);
-      if (!calm()) { shake = Math.max(shake, 10); freeze = Math.max(freeze, 5); }
+      if (!calm()) { shake = Math.max(shake, 10); hitStop(5, 0, 1, 0.7); }
       const team = e.m === "o" ? "o" : "x";
       koTrack.alive[team]--;
       const decisive = koTrack.alive[team] <= 0 || e.t - koTrack.last < 45;
       koTrack.last = e.t;
       STATS.ko++;
-      if (decisive && !calm()) { slow = { t: 60, f: 0.28 }; STATS.slow++; }
+      if (decisive && !calm()) { hitStop(0, 60, 0.28, 1); STATS.slow++; }
       CS.delete(e.id);
       nearCritters(e.x, e.y, 200, s => { s.startle = 1; s.fear = Math.max(s.fear, 0.7); });
     } else if (e.type === "e") {
       boomFx(e); if (!quiet) sfx.boom(); buzz(40);
-      if (!calm()) { shake = Math.max(shake, 16); freeze = Math.max(freeze, 4); }
+      if (!calm()) { shake = Math.max(shake, 16); hitStop(4, 24, 0.4, 1); }
       nearCritters(e.x, e.y, e.r * 1.6, s => { s.startle = 1; s.fear = Math.max(s.fear, 0.8); });
     } else if (e.type === "n") { if (!quiet) sfx.drop(); }
   }
@@ -460,15 +463,12 @@
     if (acting && !acting.played && stepPlay(acting)) { acting.played = true; reactToShot(acting.team, acting.evs); tryFinish(); }
     if (replay) stepReplay();
     stepParticles();
-    if (cam.hold > 0 && !currentHog()) cam.hold--;
   }
   let lastDrawT = performance.now();
   function draw() {
-    const nowT = performance.now(), dtf = clamp((nowT - lastDrawT) / 16.667, 0.3, 3); lastDrawT = nowT;
+    const nowT = performance.now(), lastDrawT0 = lastDrawT, dtf = clamp((nowT - lastDrawT) / 16.667, 0.3, 3); lastDrawT = nowT;
     if (slow.t > 0) slow.t -= dtf;
-    const g = camGoal();
-    if (cam.snap || calm()) { cam.x = g.x; cam.s = g.s; cam.snap = false; }
-    else { cam.x += (g.x - cam.x) * 0.09; cam.s += (g.s - cam.s) * 0.08; }
+    cam.update((nowT - lastDrawT0) / 1000, camIntent());
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const sx = shake ? (Math.random() - 0.5) * shake : 0, sy = shake ? (Math.random() - 0.5) * shake : 0;
     ctx.translate(sx, sy);
@@ -504,8 +504,8 @@
     if (ptrs.size === 2) {
       // druhý prst: zoom, rozpracované míření se zruší
       aim = null; pan = null;
-      const [a, b] = [...ptrs.values()], mx = (a[0] + b[0]) / 2;
-      pinch = { d0: Math.max(20, Math.hypot(a[0] - b[0], a[1] - b[1])), s0: cam.s, wx: toWorld(mx, 0)[0] };
+      const [a, b] = [...ptrs.values()];
+      pinch = true; cam.pinchStart(a, b); syncView();
       render(); return;
     }
     if (ptrs.size > 2) return;
@@ -519,16 +519,15 @@
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     ptrs.set(e.pointerId, [x, y]);
     if (pinch && ptrs.size >= 2) {
-      const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), mx = (a[0] + b[0]) / 2;
-      const s2 = clamp(pinch.s0 * d / pinch.d0, minS(), maxS());
-      setUserCam(pinch.wx - (mx - cw / 2) / s2, s2);
+      const [a, b] = [...ptrs.values()];
+      cam.pinchMove(a, b); syncView();
     } else if (aim) {
       aim.dx = x - aim.x0; aim.dy = y - aim.y0;
       const { pow } = aimParams(aim.dx, aim.dy);
       sfx.stretch(pow); showMeter();
     } else if (pan) {
       if (Math.abs(x - pan.x0) > 4) pan.moved = true;
-      if (pan.moved) setUserCam(pan.cx - (x - pan.x0) / cam.s, cam.s);
+      if (pan.moved) { cam.panTo(pan.cx, x - pan.x0); syncView(); }
     }
   });
   const endAim = fire => {
@@ -539,7 +538,7 @@
   };
   function up(e, fire) {
     ptrs.delete(e.pointerId);
-    if (pinch) { if (ptrs.size < 2) pinch = null; return; }
+    if (pinch) { if (ptrs.size < 2) { pinch = null; cam.pinchEnd(); } return; }
     endAim(fire);
     pan = null; cv.classList.remove("pan");
   }
@@ -547,14 +546,10 @@
   cv.addEventListener("pointercancel", e => up(e, false));
   cv.addEventListener("wheel", e => {
     e.preventDefault();
-    const [x] = pt(e), wx = toWorld(x, 0)[0];
-    const s2 = clamp(cam.s * Math.exp(-e.deltaY * 0.0015), minS(), maxS());
-    setUserCam(wx - (x - cw / 2) / s2, s2);
+    const [x] = pt(e);
+    cam.zoomAt(x, Math.exp(-e.deltaY * 0.0015)); syncView();
   }, { passive: false });
-  $("viewBtn").addEventListener("click", () => {
-    if (fullNow()) setUserCam(me ? SLING[me].x : W / 2, Math.max(autoView().s, overview() * 1.8));
-    else setUserCam(W / 2, overview());
-  });
+  $("viewBtn").addEventListener("click", () => { cam.toggle(viewTeam(), me ? SLING[me].x : null); syncView(); });
   cv.tabIndex = 0;
   cv.addEventListener("keydown", e => {
     if (canAim()) {
@@ -601,7 +596,7 @@
     else if (mine === 0) { next.ph = "end"; next.win = opp; }
     else if (base.pl[opp].length === 1) { next.ph = "aim"; next.p = opp; next.hg = base.pl[opp]; next.pl = giveHog(base, opp, next.hg); }
     else { next.ph = "pick"; next.p = me; }
-    acting = { team: me, type: base.hg, base, next, evs: JP.decEvents(res.ev), rp: JP.replay(base.b, res.kf, res.ev), t: 0, evI: 0, wait: 4, played: false, ok: null };
+    acting = { team: me, type: base.hg, base, next, evs: JP.decEvents(res.ev), rp: JP.replay(base.b, res.kf, res.ev), t: 0, evI: 0, wait: 14, played: false, ok: null };
     sfx.launch(); buzz(20);
     $("meter").hidden = true;
     say("Výstřel!");
@@ -760,12 +755,13 @@
     }
     const newGame = !prev || g.id !== prev.id;
     setGame(g);
-    if (newGame) { parts = []; puff = []; CS.clear(); cam.snap = true; cam.user = null; }
+    if (newGame) { parts = []; puff = []; CS.clear(); cam.snapNext(); cam.release(); }
     afterChange(newGame);
   }
   // po změně stavu: stavba, oznámení, konec
   function afterChange(fresh) {
-    if (fresh || (myTurn() && !acting)) { cam.user = null; syncView(); }
+    if (fresh || (myTurn() && !acting)) { cam.release(); }
+    syncView();
     if (picking()) { const p = pool(); if (!pickSel || !p.includes(pickSel)) pickSel = p[0]; }
     if (ended()) {
       const won = st.win === me;
@@ -886,7 +882,7 @@
     $("waitBox").hidden = !waiting || canAim() || picking() || !!acting || !!aim;
     if (waiting) $("waitText").textContent = `${nameOf(st, opp)} ještě neotevřel(a) výzvu. Pošli odkaz do chatu.`;
     $("hint").hidden = !canAim() || !!aim || !$("waitBox").hidden;
-    $("hint").textContent = "Chyť ježka v praku, táhni dozadu a pusť. Jinde tažením posouváš scénu." + (portrait() ? " Na šířku je scéna větší." : "");
+    $("hint").textContent = portrait() ? "Chyť ježka v praku, táhni dozadu a pusť." : "Chyť ježka v praku, táhni dozadu a pusť. Jinde tažením posouváš scénu.";
     if (!aim) $("meter").hidden = true;
     const showPick = picking() && performance.now() >= pickAt;
     if (picking() && !showPick) setTimeout(render, pickAt - performance.now() + 30);
@@ -990,7 +986,7 @@
     const loser = other(st.win);
     const next = freshGame(st.x, st.o, loser, st.k, st.kc, seriesAfter());
     if (!await commit(next, cur => cur.id === st.id && cur.ph === "end", "Odvetu už mezitím založil soupeř.")) return;
-    setGame(next); parts = []; puff = []; CS.clear(); cam.snap = true;
+    setGame(next); parts = []; puff = []; CS.clear(); cam.snapNext();
     afterChange(true);
     say(`Odveta. Začíná ${nameOf(next, next.s)}.`);
   }
@@ -1161,7 +1157,7 @@
     const saved = store.get("jp-r-" + id);
     me = saved === "x" || saved === "o" ? saved : room.sx === device ? "x" : room.so === device ? "o" : null;
     lastChange = Date.now(); schedule(2500);
-    cam.snap = true;
+    cam.snapNext();
     if (!me && freeSeat() && !ended()) { cast($("introCast")); setView("intro"); return; }
     setView("play"); afterChange(false);
   }
@@ -1179,7 +1175,11 @@
   if (TEST) {
     window.JPT = {
       speed: 1,
-      cam: () => ({ x: cam.x, s: cam.s, user: !!cam.user, full: overview(), fs: !!fsEl(), fsOK }),
+      cam: () => ({ x: cam.x, y: cam.y, s: cam.s, user: cam.isManual(), full: overview(), home: cam.restView(viewTeam()), homeS: cam.homeS(), ground: toScreen(0, GY)[1], crit: 2 * JP.CR * cam.s, portrait: portrait(), label: $("viewLbl").textContent, fs: !!fsEl(), fsOK }),
+      hogScreen: () => { const h = currentHog(); return h ? toScreen(h.x, h.y) : null; },
+      // y na obrazovce nejvyššího tělesa, které je v záběru (pevnost, ne ježek)
+      topY: () => Math.min(...st.b.map(b => [toScreen(b.x, b.y - (b.k === "C" ? JP.CR : 24))]).filter(([p]) => p[0] > 0 && p[0] < cw).map(([p]) => p[1])),
+      proj: (x, y) => { const [sx, sy] = toScreen(x, y); const r = cv.getBoundingClientRect(); return [r.left + sx, r.top + sy]; },
       stats: STATS, calm,
       crit: () => [...CS.values()].filter(s => frameN - s.last <= 3).map(s => ({ t: s.t, fear: +s.fear.toFixed(2), hit: +s.hit.toFixed(2), cheer: +s.cheer.toFixed(2), sad: +s.sad.toFixed(2), startle: +s.startle.toFixed(2) })),
       sling: () => { const [x, y] = toScreen(SLING[me].x, SLING[me].y); const r = cv.getBoundingClientRect(); return [r.left + x, r.top + y]; },

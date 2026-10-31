@@ -26,7 +26,8 @@ const other = p => p === "x" ? "o" : "x";
 (async () => {
   const bA = await chromium.launch(), bB = await webkit.launch();
   const A = await (await bA.newContext({ viewport: { width: 1366, height: 820 } })).newPage();
-  const ctxB = await bB.newContext({ ...devices["iPhone 13"] });
+  // iPhone 13 na výšku: 390×844 (celá obrazovka v PWA), BH=664 simuluje Safari s lištami
+  const ctxB = await bB.newContext({ ...devices["iPhone 13"], viewport: { width: 390, height: +process.env.BH || 844 } });
   const B = await ctxB.newPage();
   const errs = [];
   for (const [n, p] of [["A", A], ["B", B]]) p.on("pageerror", e => errs.push(n + ": " + e.message));
@@ -62,9 +63,11 @@ const other = p => p === "x" ? "o" : "x";
   // 3) rozvržení a kamera
   const ca = await camOf(A), cb = await camOf(B);
   check("desktop: výchozí pohled = celá scéna", Math.abs(ca.s - ca.full) < 0.01, `s ${ca.s.toFixed(3)} / celá ${ca.full.toFixed(3)}`);
-  const fortsIn = await B.evaluate(() => { const c = window.JPT.cam(); return [70, 1330].map(x => innerWidth / 2 + (x - c.x) * c.s); });
-  const critIn = await B.evaluate(() => { const c = window.JPT.cam(); return [160, 1240].map(x => innerWidth / 2 + (x - c.x) * c.s); });
-  check("iPhone na výšku: v záběru postavičky obou pevností přes celou šířku", critIn[0] >= 0 && critIn[1] <= 390 && critIn[1] - critIn[0] > 330, critIn.map(v => v.toFixed(0)).join(" až "));
+  // výchozí pohled na výšku: přiblížený na pevnost a prak toho, kdo je na tahu (Radka čeká, na tahu je Mark → jeho pevnost vlevo)
+  const homeB = await B.evaluate(() => { const c = window.JPT.cam(); const P = window.JPT.proj; return { c, crit: [160, 175, 268].map(x => P(x, 800)[0]), top: P(268, 576)[1], sling: P(420, 748), ground: c.ground, vh: innerHeight }; });
+  check("iPhone na výšku: výchozí záběr je přiblížený na pevnost (ne celá scéna)", homeB.c.portrait && homeB.c.s > homeB.c.full * 2.5 && Math.abs(homeB.c.s - homeB.c.homeS) < 0.01, `s ${homeB.c.s.toFixed(3)} / celá ${homeB.c.full.toFixed(3)}`);
+  check("iPhone na výšku: postavička má na obrazovce ≥ 36 px", homeB.c.crit >= 36, homeB.c.crit.toFixed(1) + " px");
+  check("iPhone na výšku: pevnost a prak jsou celé v záběru, pod zemí jen pruh hlíny", homeB.crit.every(x => x > 5 && x < 385) && homeB.sling[0] < 370 && homeB.sling[0] > 20 && homeB.vh - homeB.ground < 0.16 * homeB.vh && homeB.vh - homeB.ground > 60, `postavičky ${homeB.crit.map(v => v.toFixed(0))}, hlína ${(homeB.vh - homeB.ground).toFixed(0)} px`);
   const lblVis = await A.locator("#viewLbl").isVisible(), lblB = await B.locator("#viewLbl").isVisible();
   const toolsA = await A.locator(".tools").boundingBox(), toolsB = await B.locator(".tools").boundingBox();
   check("desktop: nástroje s popisky v řadě dole, mobil: ikony ve sloupci nahoře", lblVis && !lblB && toolsA.width > toolsA.height && toolsA.y > 700 && toolsB.height > toolsB.width && toolsB.y < 120);
@@ -76,13 +79,13 @@ const other = p => p === "x" ? "o" : "x";
 
   // posun tažením mimo prak (iPhone)
   const vb = B.viewportSize();
-  await B.click("#viewBtn");   // přiblížit, ať je kam posouvat
-  const cbz = await camOf(B);
+  await B.waitForTimeout(300);
+  const cbz = await camOf(B);   // už je přiblíženo, je kam posouvat
   await B.mouse.move(vb.width * 0.5, vb.height * 0.3); await B.mouse.down();
   for (let i = 1; i <= 5; i++) await B.mouse.move(vb.width * 0.5 + i * 30, vb.height * 0.3);
   await B.mouse.up();
   const cb2 = await camOf(B);
-  check("iPhone: posun tažením mimo prak", cb2.user && cb2.x < cbz.x - 100, `x ${cbz.x.toFixed(0)} → ${cb2.x.toFixed(0)}`);
+  check("iPhone: posun tažením mimo prak", cb2.user && cb2.x < cbz.x - 60, `x ${cbz.x.toFixed(0)} → ${cb2.x.toFixed(0)}`);
   // pinch dvěma prsty (syntetické pointer události)
   await B.evaluate(({ w, h }) => {
     const c = document.getElementById("stage");
@@ -92,17 +95,23 @@ const other = p => p === "x" ? "o" : "x";
     ev("pointerup", 11, w * 0.45 + 30); ev("pointerup", 12, w * 0.55 - 30);
   }, { w: vb.width, h: vb.height });
   const cb3 = await camOf(B);
-  check("iPhone: pinch oddálí scénu", cb3.s < cb2.s * 0.85, `s ${cb2.s.toFixed(3)} → ${cb3.s.toFixed(3)}`);
-  await B.click("#viewBtn");
+  check("iPhone: pinch oddálí scénu a tlačítko nabídne návrat na hru", cb3.s < cb2.s * 0.85 && cb3.label === "Zpět na hru", `s ${cb2.s.toFixed(3)} → ${cb3.s.toFixed(3)}, „${cb3.label}“`);
+  // oddáleno pinchem → lupa vrátí pevnost a prak, další klik ukáže celou scénu
+  await B.click("#viewBtn"); await B.waitForTimeout(3000);
   const cb4 = await camOf(B);
-  check("iPhone: lupa přepíná celou scénu / přiblížení", Math.abs(cb4.s - cb4.full) < 0.01 || cb4.s > cb3.s, `s ${cb4.s.toFixed(3)}`);
+  check("iPhone: lupa po oddálení vrátí záběr na pevnost a prak", !cb4.user && Math.abs(cb4.s - cb4.homeS) < 0.02 && cb4.crit >= 36, `s ${cb3.s.toFixed(3)} → ${cb4.s.toFixed(3)}`);
+  await B.click("#viewBtn"); await B.waitForTimeout(3000);
+  const cb5 = await camOf(B);
+  check("iPhone: lupa oddálí na celou scénu", cb5.user && Math.abs(cb5.s - cb5.full) < 0.02 && Math.abs(cb5.x - 700) < 80, `s ${cb5.s.toFixed(3)} / celá ${cb5.full.toFixed(3)}, x ${cb5.x.toFixed(0)}`);
+  await shot(B, "05b-iphone-vyska-cela-scena");
+  await B.click("#viewBtn"); await B.waitForTimeout(3000);
   // kolečko myši + celá scéna (desktop)
   await A.mouse.move(683, 400); await A.mouse.wheel(0, -400); await A.waitForTimeout(100);
   const ca2 = await camOf(A);
   check("desktop: kolečko myši přiblíží", ca2.s > ca.s * 1.3, `s ${ca.s.toFixed(3)} → ${ca2.s.toFixed(3)}`);
-  await A.click("#viewBtn");
+  await A.click("#viewBtn"); await A.waitForTimeout(1800);
   const ca3 = await camOf(A);
-  check("desktop: tlačítko Celá scéna oddálí", Math.abs(ca3.s - ca3.full) < 0.01, `s ${ca3.s.toFixed(3)}`);
+  check("desktop: tlačítko Celá scéna oddálí a vrátí automatiku", Math.abs(ca3.s - ca3.full) < 0.01 && !ca3.user, `s ${ca3.s.toFixed(3)}`);
   // fullscreen: Chromium skutečně, iPhone nápověda Přidat na plochu
   await A.click("#fsBtn"); await A.waitForTimeout(400);
   const fs1 = (await camOf(A)).fs;
@@ -119,34 +128,67 @@ const other = p => p === "x" ? "o" : "x";
 
   // 4) partie
   for (const p of [A, B]) await p.evaluate(() => { window.JPT.speed = 3; });
-  let turns = 0, sawReplay = false, sawPick = false, syncOk = true, follow = null, landscape = false, twistSeen = 0, usedTypes = new Set(["n"]), firstRound = null;
+  let takeover = false, pickChecked = false, slingChecked = false, flightB = null, turns = 0, sawReplay = false, sawPick = false, syncOk = true, follow = null, landscape = false, twistSeen = 0, usedTypes = new Set(["n"]), firstRound = null;
   const NAMES = { n: "Obyčejný", k: "Kamenný", g: "Gumový", b: "Bouchací" };
   const WANT = ["b", "k", "g", "n"];
   while (turns < 40) {
     const ia = await info(A);
     if (ia.ph === "end") break;
-    if (turns === 1 && !landscape) {
-      landscape = true;
-      await B.setViewportSize({ width: 844, height: 390 });
-      await B.waitForTimeout(300);
-      const cl = await camOf(B);
-      check("iPhone na šířku: celá scéna, nástroje vpravo", Math.abs(cl.s - cl.full) < 0.05 || cl.user, `s ${cl.s.toFixed(3)}`);
-      await shot(B, "06-iphone-sirka");
-    }
     const P = ia.p === "x" ? A : B, O = ia.p === "x" ? B : A, nm = ia.p === "x" ? "Mark" : "Radka";
     await P.waitForFunction(() => document.title.startsWith("Jsi na tahu"), null, { timeout: T });
     const best = await P.evaluate(() => window.JPT.best(6000));
     const [sx, sy] = await P.evaluate(() => window.JPT.sling());
     const s0 = await camOf(P);
+    if (P === B && !slingChecked) {
+      slingChecked = true;
+      await B.waitForTimeout(1200);
+      const r = await B.evaluate(() => {
+        const box = q => { const e = document.querySelector(q); if (!e || e.hidden) return null; const b = e.getBoundingClientRect(); return b.width ? { x: b.left, y: b.top, w: b.width, h: b.height } : null; };
+        return { sling: window.JPT.sling(), boxes: [".top", ".tools", "#status", "#hogChip"].map(box).filter(Boolean), cam: window.JPT.cam(), vw: innerWidth };
+      });
+      const [hx, hy] = r.sling;
+      const near = r.boxes.some(b => hx > b.x - 24 && hx < b.x + b.w + 24 && hy > b.y - 24 && hy < b.y + b.h + 24);
+      check("iPhone na výšku: ježek v praku je daleko od HUD a tlačítek a od okrajů (palec, gesta Safari)", !near && hx > 30 && hx < r.vw - 30 && hy > 250, `prak ${hx.toFixed(0)}, ${hy.toFixed(0)}`);
+      check("iPhone na výšku: na tahu je pohled na vlastní pevnost a prak (kamera se po dopadu vrátila)", Math.abs(r.cam.x - r.cam.home.x) < 25 && Math.abs(r.cam.s - r.cam.homeS) < 0.02, `x ${r.cam.x.toFixed(0)} / výchozí ${r.cam.home.x.toFixed(0)}`);
+      await shot(B, "07b-iphone-vyska-miri");
+      await B.evaluate(() => { window.JPT.speed = 1; });   // kamera se měří v reálném čase, ne ve zrychlené partii
+    }
     await P.mouse.move(sx, sy); await P.mouse.down();
     for (let i = 1; i <= 6; i++) await P.mouse.move(sx + best.dx * i / 6, sy + best.dy * i / 6);
     if (turns === 0) { await P.waitForTimeout(150); await shot(P, "07-miri-desktop"); check("náhled dráhy: měřič síly a úhlu", /Síla \d+ %/.test(await P.locator("#meter").innerText())); }
     await P.mouse.up();
+    if (P === B && !flightB) {
+      // plynulý let kamery na výšku: od praku střelce k pevnosti soupeře, bez skoku
+      const xs = [], ss = [], ts = [], hs = [];
+      for (let i = 0; i < 40; i++) { const c = await camOf(B); xs.push(c.x); ss.push(c.s); ts.push(Date.now()); hs.push(await B.evaluate(() => window.JPT.hogScreen())); await B.waitForTimeout(60); if (i === 8) await shot(B, "08b-iphone-vyska-let"); }
+      const hv = hs.filter(Boolean);
+      const onScr = hv.filter(h => h[0] > 8 && h[0] < 382 && h[1] > 60 && h[1] < 800).length >= hv.length * 0.9, ahead = Math.max(...hv.map(h => h[0] - 195));   // B střílí doleva: při rychlém letu je ježek za středem (kamera před ním)
+      check("iPhone na výšku: ježek je za letu celou dobu v záběru a kamera se dívá před něj (ve směru letu)", hv.length > 5 && onScr && ahead > 40, `ježek x ${Math.min(...hv.map(h => h[0])).toFixed(0)}–${Math.max(...hv.map(h => h[0])).toFixed(0)}, za středem až o ${ahead.toFixed(0)} px`);
+      const steps = xs.slice(1).map((v, i) => Math.abs(v - xs[i]) / Math.max(1, ts[i + 1] - ts[i]) * 1000);   // rychlost kamery, jednotek světa za s (ježek letí asi 1200)
+      flightB = { min: Math.min(...xs), max: Math.max(...xs), maxStep: Math.max(...steps), mid: xs.some(v => v > 450 && v < 950), sMin: Math.min(...ss), sMax: Math.max(...ss) };
+      check("iPhone na výšku: zoom se za letu mění podle rychlosti a výšky", Math.max(...ss) - Math.min(...ss) > 0.03 && Math.min(...ss) < ss[0] * 0.97, `s ${Math.min(...ss).toFixed(3)}–${Math.max(...ss).toFixed(3)}`);
+      check("iPhone na výšku: kamera při výstřelu plynule sleduje ježka k soupeři (bez skoku)", flightB.max - flightB.min > 600 && flightB.mid && flightB.maxStep < 2600, `x ${flightB.max.toFixed(0)} → ${flightB.min.toFixed(0)}, největší rychlost kamery ${flightB.maxStep.toFixed(0)}/s, s ${flightB.sMin.toFixed(2)}–${flightB.sMax.toFixed(2)}`);
+      await P.waitForFunction(n => { const i = window.JPT.info(); return i.n > n && !i.busy && !i.acting; }, ia.n, { timeout: 60000 });
+      await B.evaluate(() => { window.JPT.speed = 3; });
+      await B.waitForTimeout(2200);
+      const cd = await camOf(B);
+      check("iPhone na výšku: po dopadu a usazení kamera zůstane na pevnosti, do které se střílelo", Math.abs(cd.x - cd.home.x) < 25 && cd.x < 450, `x ${cd.x.toFixed(0)}`);
+    }
     if (P === A && follow === null) {
       await A.waitForTimeout(500);
       const cf = await camOf(A);
       follow = cf.s > s0.s * 1.15 || Math.abs(cf.x - s0.x) > 40;
       check("kamera při výstřelu sleduje ježka", follow, `s ${s0.s.toFixed(2)} → ${cf.s.toFixed(2)}, x ${s0.x.toFixed(0)} → ${cf.x.toFixed(0)}`);
+    } else if (P === A && !takeover) {
+      // pinch / kolečko za letu převezme kameru, automatika se vypne, tlačítko ji vrátí
+      takeover = true;
+      await A.waitForTimeout(200);
+      await A.mouse.move(683, 400); await A.mouse.wheel(0, -300); await A.waitForTimeout(100);
+      const c1 = await camOf(A); await A.waitForTimeout(400); const c2 = await camOf(A);
+      check("za letu kolečko / pinch převezme kameru a ta zůstane stát", c1.user && Math.abs(c2.x - c1.x) < 2 && Math.abs(c2.s - c1.s) < 0.01, `ruční ${c1.user}, x ${c1.x.toFixed(0)} → ${c2.x.toFixed(0)}`);
+      await A.click("#viewBtn"); await A.waitForTimeout(1800);
+      const c3 = await camOf(A);
+      check("tlačítko přehledu vrátí automatickou kameru", !c3.user, `ruční ${c3.user}, „${c3.label}“`);
     }
     const n0 = ia.n;
     const seen = await O.waitForFunction(() => window.JPT.info().replay, null, { timeout: 60000, polling: 50 }).then(() => true, () => false);
@@ -163,6 +205,11 @@ const other = p => p === "x" ? "o" : "x";
     if (ip.ph === "pick") {
       await P.waitForSelector("#pickBox:not([hidden])", { timeout: T });
       if (!sawPick || (P === B && turns < 2)) await shot(P, `09-vyber-jezka-${P === A ? "desktop" : "iphone"}-${turns}`);
+      if (P === B && !pickChecked) {
+        pickChecked = true;
+        const r = await B.evaluate(() => { const b = document.getElementById("pickBox").getBoundingClientRect(); return { bottom: b.bottom, top: window.JPT.proj(268, 560)[1], ground: window.JPT.cam().ground }; });
+        check("iPhone na výšku: panel výběru ježka stojí v nebi, nezakrývá pevnost ani prak", r.bottom < r.top - 4, `panel končí ${r.bottom.toFixed(0)}, pevnost začíná ${r.top.toFixed(0)}`);
+      }
       if (!sawPick && P === A) {
         const bb = await A.locator("#pickBox").boundingBox();
         check("desktop: panel výběru ježka dole uprostřed mezi pevnostmi (nezakrývá cíl)", bb.x > 340 && bb.x + bb.width < 1030 && bb.y + bb.height < 820, JSON.stringify(bb));
@@ -210,7 +257,18 @@ const other = p => p === "x" ? "o" : "x";
   const ser = await A.locator("#endSeries").innerText();
   check("skóre série 1 : 0 pro vítěze", fa.win === "x" ? ser === "Mark 1 : 0 Radka" : ser === "Mark 0 : 1 Radka", ser);
   await shot(A, "10-konec-desktop"); await shot(B, "11-konec-iphone");
-  await B.waitForTimeout(900); await shot(B, "11-konec-iphone"); await B.setViewportSize({ width: 390, height: 664 }); await B.waitForTimeout(900); await shot(B, "12-konec-iphone-vyska"); await B.setViewportSize({ width: 844, height: 390 }); await B.waitForTimeout(300);
+  await B.waitForTimeout(900);
+  await B.setViewportSize({ width: 390, height: +process.env.BH || 844 }); await B.waitForTimeout(1500);
+  const endR = await B.evaluate(() => { const b = document.getElementById("endBox").getBoundingClientRect(); return { bottom: b.bottom, top: window.JPT.topY(), cam: window.JPT.cam() }; });
+  check("iPhone na výšku: konec hry stojí v nebi, nezakrývá pevnost", endR.bottom < endR.top - 4 && endR.cam.portrait, `box končí ${endR.bottom.toFixed(0)}, pevnost začíná ${endR.top.toFixed(0)}`);
+  await shot(B, "12-konec-iphone-vyska");
+  await B.setViewportSize({ width: 390, height: 664 }); await B.waitForTimeout(1200); await shot(B, "12b-konec-iphone-vyska-nizky");
+  const endR2 = await B.evaluate(() => { const b = document.getElementById("endBox").getBoundingClientRect(); return { bottom: b.bottom, top: window.JPT.topY() }; });
+  check("iPhone na výšku (664 px, Safari s lištami): konec hry nezakrývá pevnost", endR2.bottom < endR2.top - 2, `box končí ${endR2.bottom.toFixed(0)}, pevnost začíná ${endR2.top.toFixed(0)}`);
+  await B.setViewportSize({ width: 844, height: 390 }); await B.waitForTimeout(1200);
+  const cl = await camOf(B);
+  check("iPhone na šířku: celá scéna (beze změny)", Math.abs(cl.s - cl.full) < 0.05 && !cl.portrait, `s ${cl.s.toFixed(3)} / celá ${cl.full.toFixed(3)}`);
+  await shot(B, "06-iphone-sirka"); await shot(B, "11-konec-iphone");
 
   // 5) odveta
   await W_.click("#endPrimary");
@@ -230,6 +288,25 @@ const other = p => p === "x" ? "o" : "x";
   await C.goto(linkT); await C.waitForSelector("#hud:not([hidden])", { timeout: T });
   const ic = await info(C);
   check("přihlížející (reduced motion) vidí partii bez židle", ic.me === null && ic.n === 0 && /míří/.test(await C.locator("#status").innerText()));
+  {
+    // přihlížející s omezeným pohybem: kamera při výstřelu jen skočí (prak střelce → pevnost cíle), neplyne
+    const ip = await info(A), P = ip.p === "x" ? A : B;
+    await P.waitForFunction(() => document.title.startsWith("Jsi na tahu"), null, { timeout: T });
+    const best = await P.evaluate(() => window.JPT.best(4000)), [sx, sy] = await P.evaluate(() => window.JPT.sling());
+    await P.mouse.move(sx, sy); await P.mouse.down();
+    for (let i = 1; i <= 6; i++) await P.mouse.move(sx + best.dx * i / 6, sy + best.dy * i / 6);
+    await P.mouse.up();
+    const xs = [];
+    const seen = await C.waitForFunction(() => window.JPT.info().replay, null, { timeout: 60000, polling: 40 }).then(() => true, () => false);
+    for (let i = 0; i < 70 && seen; i++) { xs.push((await camOf(C)).x); await C.waitForTimeout(50); }
+    const lo = Math.min(...xs), hi = Math.max(...xs);
+    let run = 0, longest = 0, plateaus = 0, prev = "";
+    for (const v of xs) {
+      const st = v < lo + 8 ? "lo" : v > hi - 8 ? "hi" : "mid";
+      if (st === "mid") longest = Math.max(longest, ++run); else { run = 0; if (st !== prev) plateaus++; prev = st; }
+    }
+    check("prefers-reduced-motion: kamera při výstřelu nesleduje ježka, jen dvě krátké přechody (prak → pevnost cíle)", seen && hi - lo > 600 && plateaus <= 3 && longest <= 14, `rozsah ${Math.round(hi - lo)}, nejdelší přechod ${longest * 50} ms, ${plateaus} poloh`);
+  }
   await bC.close();
 
   // 7) obnovení stránky a návrat na výšku

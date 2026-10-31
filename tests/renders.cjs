@@ -13,7 +13,7 @@ const T = 30000, sleep = ms => new Promise(r => setTimeout(r, ms));
   const bA = await chromium.launch(), bB = await webkit.launch();
   const profiles = [
     ["desktop", bA, { viewport: { width: 1366, height: 820 } }],
-    ["iphone-vyska", bB, { ...devices["iPhone 13"] }],
+    ["iphone-vyska", bB, { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } }],
     ["iphone-sirka", bB, { ...devices["iPhone 13 landscape"] }],
   ];
   for (const [name, br, opts] of profiles) {
@@ -44,11 +44,17 @@ const T = 30000, sleep = ms => new Promise(r => setTimeout(r, ms));
     await q.click("#acceptBtn"); await q.waitForSelector("#hud:not([hidden])", { timeout: T });
     await p.waitForFunction(() => document.title.startsWith("Jsi na tahu"), null, { timeout: T }); await sleep(600);
     await shot("8-na-tahu"); await q.screenshot({ path: path.join(SHOTS, `${name}-9-soupere-miri.png`) });
-    // míření + menu + nápověda
+    // celá scéna lupou a zpět
+    await p.click("#viewBtn"); await sleep(1400); await shot("8b-cela-scena"); await p.click("#viewBtn"); await sleep(1400);
+    // míření (skutečná dobrá rána) + let + dopad + výběr ježka
+    const best = await p.evaluate(() => window.JPT.best(6000));
     const [sx, sy] = await p.evaluate(() => window.JPT.sling());
     await p.mouse.move(sx, sy); await p.mouse.down();
-    for (let i = 1; i <= 8; i++) await p.mouse.move(sx - i * 12, sy + i * 6);
+    for (let i = 1; i <= 8; i++) await p.mouse.move(sx + best.dx * i / 8, sy + best.dy * i / 8);
     await sleep(200); await shot("10-mireni"); await p.mouse.up();
+    await sleep(500); await shot("10b-let-start"); await q.screenshot({ path: path.join(SHOTS, `${name}-10b-let-soupere.png`) });
+    await sleep(500); await shot("10c-let-stred");
+    await sleep(500); await shot("10d-dopad");
     await p.waitForSelector("#pickBox:not([hidden])", { timeout: 60000 }); await shot("11-vyber-jezka");
     await p.click('#kinds [data-k="k"]'); await sleep(200); await shot("12-vyber-kamenny");
     await p.click("#sendBtn");

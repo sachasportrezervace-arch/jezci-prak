@@ -153,6 +153,16 @@
     .end { top: 120px; bottom: auto; left: calc(50% - 34px); width: min(calc(100vw - 92px), 420px); transform: translateX(-50%); }
     .end.go { animation-name: dropB; }
   }
+  /* nižší telefony na výšku (SE, menší Androidy): pevnost je výš, výběr ježka je jedna řada ikon a konec hry kompaktní */
+  @media (orientation: portrait) and (max-width: 600px) and (max-height: 740px) {
+    .pickbox { top: 104px; padding: 8px 8px 10px; gap: 6px; }
+    .pickbox h3 { display: none; }
+    .pickbox .kinds { grid-template-columns: repeat(4, 1fr); gap: 5px; }
+    .pickbox .kind { flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 1px; min-height: 68px; padding: 4px 2px calc(4px + var(--lip)); font-size: 12.5px; }
+    .pickbox .kind .kt { display: contents; } .pickbox .kind .ki { display: none; } .pickbox .kind img { width: 34px; height: 34px; }
+    .end { top: 104px; padding: 12px 14px 14px; }
+    .card.end h2 { font-size: 28px; } .card.end .series { margin: 2px 0; font-size: 18px; } .card.end .stake { margin-bottom: 8px; font-size: 15px; }
+  }
   .end h2 { font-size: clamp(30px, 8vw, 40px); margin-bottom: 4px; }
   .end .series { font-family: "Titan One", sans-serif; font-size: 20px; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
   .end .stake { font-weight: 700; margin: 0 0 14px; text-wrap: balance; }
@@ -374,6 +384,7 @@
 <script src="vendor/matter-0.19.0.min.js"></script>
 <script src="engine.js"></script>
 <script src="art.js"></script>
+<script src="camera.js"></script>
 <script src="game.js"></script>
 </body>
 </html>
