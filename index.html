@@ -6,6 +6,12 @@
 <title>Ježkomet</title>
 <meta name="description" content="Tahová prakovačka pro dva na jednom odkazu: střílej ježka na soupeřovu pevnost a shoď jeho tři postavičky.">
 <meta name="theme-color" content="#7FD6F2">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ježkomet">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Titan+One&display=swap" rel="stylesheet">
@@ -92,19 +98,21 @@
     background: var(--lime); border: 3px solid var(--ink); border-radius: 999px; padding: 3px 14px 4px; font-weight: 800; font-size: 16px; white-space: nowrap; max-width: calc(100vw - 24px); overflow: hidden; text-overflow: ellipsis;
     box-shadow: 0 6px 14px -8px rgba(43, 22, 56, .6); }
   .status.wait { background: var(--paper); }
+  @media (max-width: 899px), (pointer: coarse) { .status { max-width: calc(100vw - 140px); } }
   .status.pulse { animation: pulse 1.6s ease-in-out infinite; }
   @keyframes pulse { 50% { transform: translateX(-50%) scale(1.05); } }
-  .tools { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+  .tools { position: absolute; right: max(10px, env(safe-area-inset-right)); top: calc(max(10px, env(safe-area-inset-top)) + 62px); display: flex; flex-direction: column; gap: 8px; }
+  .tools .lbl { display: none; }
   .meter { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); pointer-events: none; font-weight: 800; font-size: 15px;
     background: var(--paper); border: 3px solid var(--ink); border-radius: 999px; padding: 2px 12px 3px; font-variant-numeric: tabular-nums; }
-  .hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); pointer-events: none; text-align: center; font-weight: 700; font-size: 15px;
+  .hint { position: absolute; left: 50%; width: max-content; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); pointer-events: none; text-align: center; font-weight: 700; font-size: 15px;
     color: var(--ink); background: rgba(255, 248, 234, .92); border: 3px solid var(--ink); border-radius: 16px; padding: 4px 14px 5px; max-width: min(92vw, 420px); text-wrap: balance; }
   .waitbox { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom)); display: grid; gap: 8px; justify-items: center;
     background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; padding: 10px 14px 12px; width: min(92vw, 380px); text-align: center; box-shadow: var(--shadow); }
   .waitbox p { margin: 0; font-weight: 700; text-wrap: balance; }
 
   /* stavba */
-  .buildbox { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(max(10px, env(safe-area-inset-bottom)) + 60px); width: min(96vw, 520px);
+  .buildbox { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(10px, env(safe-area-inset-bottom)); width: min(96vw, 520px);
     background: var(--paper); border: 3px solid var(--ink); border-radius: 22px; padding: 10px 10px 12px; box-shadow: var(--shadow); display: grid; gap: 8px; }
   .buildbox h3 { margin: 0; font-size: 16px; font-weight: 800; text-align: center; }
   .kinds { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 8px; }
@@ -128,8 +136,6 @@
   .menu { display: grid; gap: 10px; }
   .toast { position: fixed; left: 50%; top: calc(max(10px, env(safe-area-inset-top)) + 100px); transform: translateX(-50%); z-index: 10; background: var(--ink); color: var(--paper);
     border-radius: 14px; padding: 8px 16px; font-weight: 700; max-width: 90vw; text-align: center; }
-  .rotate-tip { position: absolute; left: 50%; transform: translateX(-50%); top: calc(max(10px, env(safe-area-inset-top)) + 96px); font-size: 14px; font-weight: 700; color: var(--ink-2); pointer-events: none; white-space: nowrap; }
-  @media (orientation: landscape), (min-width: 700px) { .rotate-tip { display: none; } }
   @media (max-width: 420px) {
     .plate { gap: 5px; padding-right: 8px; } .plate.o { padding-left: 8px; } .plate .nm { font-size: 14px; } .lives { gap: 0; } .lives img { width: 19px; height: 19px; } .score { font-size: 18px; }
     .kinds { gap: 6px; } .kind { font-size: 13px; padding-inline: 2px; } .kind canvas { width: 52px; height: 24px; }
@@ -137,9 +143,35 @@
   @media (max-height: 430px) and (orientation: landscape) {
     .status { top: auto; bottom: max(12px, env(safe-area-inset-bottom)); left: 12px; transform: none; font-size: 14px; }
     .status.pulse { animation: none; }
-    .buildbox { width: min(60vw, 470px); left: auto; right: 64px; bottom: max(10px, env(safe-area-inset-bottom)); transform: none; padding: 6px 8px 8px; gap: 4px; }
+    .buildbox { width: min(62vw, 470px); left: auto; right: 70px; bottom: max(10px, env(safe-area-inset-bottom)); transform: none; padding: 6px 8px 8px; gap: 4px; }
     .buildbox h3 { display: none; } .kind { min-height: 54px; } .buildbox .btn.wide { min-height: 44px; }
     .meter, .hint { bottom: max(10px, env(safe-area-inset-bottom)); }
+  }
+  @media (max-height: 430px) and (orientation: landscape) {
+    .tools { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); gap: 6px; }
+    .tools .icon { width: 44px; height: 44px; min-height: 44px; }
+    .top { padding-right: calc(max(10px, env(safe-area-inset-right)) + 54px); }
+  }
+  /* ---------- desktop: vlastní rozvržení (myš, velká obrazovka) ---------- */
+  @media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 560px) {
+    .top { padding: 18px 24px 0; gap: 16px; }
+    .plate { padding: 6px 16px 6px 8px; gap: 12px; border-radius: 22px; }
+    .plate.o { padding: 6px 8px 6px 16px; }
+    .plate .nm { font-size: 22px; }
+    .lives img { width: 38px; height: 38px; }
+    .score { font-size: 30px; padding: 8px 16px 9px; border-radius: 16px; }
+    .status { top: 92px; font-size: 19px; padding: 4px 20px 6px; }
+    .tools { top: auto; bottom: 20px; right: 24px; flex-direction: row; gap: 10px; }
+    .tools .btn { width: auto; padding: 6px 14px calc(6px + var(--lip)); gap: 8px; font-size: 16px; }
+    .tools .lbl { display: inline; }
+    .hint, .meter { bottom: 24px; font-size: 17px; }
+    .waitbox { bottom: 24px; }
+    .buildbox { left: auto; right: 24px; top: 50%; bottom: auto; transform: translateY(-50%); width: 300px; padding: 14px; gap: 12px; }
+    .buildbox h3 { font-size: 18px; }
+    .kinds { grid-template-columns: 1fr 1fr; }
+    .kind { min-height: 84px; font-size: 16px; } .kind canvas { width: 90px; height: 38px; }
+    .end { width: 460px; }
+    #stage.pan { cursor: move; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -207,7 +239,7 @@
     <p class="lead" id="introMeta" style="margin:0"></p>
     <div class="cast" id="introCast" aria-hidden="true"></div>
     <ul style="margin:0;padding-left:20px">
-      <li>Natáhni prak tažením prstem dozadu a pusť.</li>
+      <li>Chyť ježka v praku, táhni ho dozadu a pusť.</li>
       <li>Postavička vypadne, když spadne na zem nebo dostane pořádnou ránu.</li>
       <li>Po každém výstřelu si přidáš jednu kostku do své pevnosti.</li>
     </ul>
@@ -233,8 +265,7 @@
     <div class="plate o" id="plateO"><div class="lives" id="livesO"></div><span class="nm" id="nmO"></span></div>
   </div>
   <div class="status" id="status"></div>
-  <div class="rotate-tip" id="rotTip">Na šířku je lepší výhled</div>
-  <div class="meter" id="meter" hidden></div>
+    <div class="meter" id="meter" hidden></div>
   <div class="hint" id="hint" hidden></div>
   <div class="waitbox" id="waitBox" hidden><p id="waitText"></p><button class="btn small" id="waitCopy" type="button">Zkopírovat odkaz</button></div>
   <div class="buildbox" id="buildBox" hidden>
@@ -243,8 +274,10 @@
     <button class="btn wide" id="dropBtn" type="button">Pustit kostku</button>
   </div>
   <div class="tools">
-    <button class="btn paper icon" id="soundBtn" type="button" aria-label="Zvuk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="soundWave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path id="soundOff" d="M17 9l5 6M22 9l-5 6" hidden/></svg></button>
-    <button class="btn paper icon" id="menuBtn" type="button" aria-label="Nabídka"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button class="btn paper icon" id="soundBtn" type="button" aria-label="Zvuk"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path id="soundWave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path id="soundOff" d="M17 9l5 6M22 9l-5 6" hidden/></svg><span class="lbl" id="soundLbl">Zvuk</span></button>
+    <button class="btn paper icon" id="viewBtn" type="button" aria-label="Celá scéna"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/><path id="viewMinus" d="M7.5 10.5h6"/><path id="viewPlus" d="M10.5 7.5v6" hidden/></svg><span class="lbl" id="viewLbl">Celá scéna</span></button>
+    <button class="btn paper icon" id="fsBtn" type="button" aria-label="Celá obrazovka"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path id="fsIn" d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/><path id="fsOut" d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" hidden/></svg><span class="lbl" id="fsLbl">Celá obrazovka</span></button>
+    <button class="btn paper icon" id="menuBtn" type="button" aria-label="Nabídka"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="lbl">Nabídka</span></button>
   </div>
   <div class="card end" id="endBox" hidden>
     <h2 id="endTitle"></h2>
@@ -266,10 +299,21 @@
     <button class="btn small" data-close type="button">Zavřít</button>
   </div>
 </dialog>
+<dialog id="a2hsSheet" aria-labelledby="a2hsTitle">
+  <h2 id="a2hsTitle">Přes celou obrazovku</h2>
+  <p>Safari na iPhonu neumí stránku roztáhnout. Přidej si hru na plochu, pak se otevře bez lišt:</p>
+  <ol>
+    <li>Ťukni dole na <b>Sdílet</b> (čtvereček se šipkou nahoru).</li>
+    <li>Vyber <b>Přidat na plochu</b> a potvrď.</li>
+    <li>Hru spouštěj ikonou ježka z plochy.</li>
+  </ol>
+  <button class="btn wide" data-close type="button">Rozumím</button>
+</dialog>
 <dialog id="helpSheet" aria-labelledby="helpTitle">
   <h2 id="helpTitle">Jak se hraje</h2>
   <ul>
-    <li><b>Výstřel:</b> kdekoli na scéně táhni prstem nebo myší dozadu, tečky ukazují začátek dráhy. Pusť a ježek letí. Na klávesnici šipky a mezerník.</li>
+    <li><b>Výstřel:</b> chyť ježka v praku a táhni dozadu, tečky ukazují začátek dráhy. Pusť a ježek letí. Na klávesnici šipky a mezerník.</li>
+    <li><b>Kamera:</b> tažením mimo prak posouváš scénu, dvěma prsty (nebo kolečkem myši) přibližuješ. Lupa ukáže celou scénu.</li>
     <li><b>Vyřazení:</b> postavička vypadne, když spadne na zem nebo ji trefí pořádná rána. Sklo praskne hned, dřevo vydrží víc, kámen nejvíc.</li>
     <li><b>Stavba:</b> po každém výstřelu si přidáš jednu kostku do své pevnosti. Vyber druh, posuň ji a pusť.</li>
     <li><b>Výhra:</b> kdo první shodí všechny tři soupeřovy postavičky. Pak odveta, skóre série se počítá.</li>
