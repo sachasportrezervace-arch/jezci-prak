@@ -675,11 +675,14 @@
   let ghost = null;         // { kind, rot, x, y, yh, ok, why }
   let drag = null;          // tažení ducha prstem / myší
   let bannerFor = "";
+  let herna = null;         // místnost Herny (#herna=1&…), viz „Herna“ níže; null = hra jako dřív
 
   const nameOf = (g, p) => p === "x" ? g.x : g.o;
   const ended = () => !!st && st.ph === "end";
   const myTurn = () => !!st && !!me && st.p === me && !ended();
-  const ready = () => !acting && !replay && !busy && view === "play";
+  // v Herně se střílí až ve dvou (zakladatel nesmí táhnout, dokud si soupeř nesedne)
+  const hernaHold = () => !!herna && !!room && !!freeSeat() && !ended();
+  const ready = () => !acting && !replay && !busy && view === "play" && !hernaHold();
   const handOf = (g, t) => g && g.hd ? g.hd[t] || "" : "";
   const canAim = () => myTurn() && st.ph === "t" && mode === "shoot" && !!handOf(st, me) && ready();
   const picking = () => myTurn() && st.ph === "pick" && !acting && !replay && view === "play";
@@ -1300,6 +1303,7 @@
     }
   }
   function render() {
+    hernaSync();
     if (view === "share") renderShare();
     if (view === "intro") renderIntro();
     if (view !== "play" || !st) { document.title = "Ježkomet"; return; }
@@ -1332,6 +1336,7 @@
     else if (acting) s = acting.played ? "Odesílám…" : acting.kind === "s" ? "Letí!" : "Stavíš…";
     else if (replay) { const a = replay.acts[replay.i]; s = a ? (a.kind === "s" ? `${nameOf(st, a.by)} střílí!` : `${nameOf(st, a.by)} staví…`) : ""; }
     else if (busy) s = "Odesílám…";
+    else if (hernaHold()) s = "Čeká se na soupeře…";
     else if (myTurn() && st.ph === "t") { s = mode === "build" ? "Stavíš: vyber díl a místo" : "Jsi na tahu"; waitStyle = false; pulse = mode !== "build"; }
     else if (myTurn() && st.ph === "pick") { s = "Vyber ježka pro soupeře"; waitStyle = false; }
     else s = st.ph === "pick" ? (me && me !== st.p ? `${nameOf(st, st.p)} ti vybírá ježka…` : `${nameOf(st, st.p)} vybírá ježka…`) : `${nameOf(st, st.p)} je na tahu…`;
@@ -1339,7 +1344,8 @@
     $("status").classList.toggle("wait", waitStyle); $("status").classList.toggle("pulse", pulse && !calm());
     const waiting = !!me && !!freeSeat() && !ended();
     $("waitBox").hidden = !waiting || canAim() || picking() || building() || !!acting || !!aim;
-    if (waiting) $("waitText").textContent = `${nameOf(st, opp)} ještě neotevřel(a) výzvu. Pošli odkaz do chatu.`;
+    if (waiting) $("waitText").textContent = herna ? `Čeká se, až si ${nameOf(st, opp)} sedne ke hře.` : `${nameOf(st, opp)} ještě neotevřel(a) výzvu. Pošli odkaz do chatu.`;
+    $("waitCopy").hidden = !!herna;
     // nápověda míření jen do prvního výstřelu na tomhle zařízení
     $("hint").hidden = !canAim() || !!aim || !$("waitBox").hidden || !$("banner").hidden || store.get("jp-aimed") === "1";
     $("hint").textContent = desktop() ? "Chyť ježka v praku, táhni dozadu a pusť. Jinde tažením posouváš scénu." : "Chyť ježka v praku, táhni dozadu a pusť.";
@@ -1350,6 +1356,7 @@
     $("endBox").hidden = !showEnd;
     $("hud").classList.toggle("ended", showEnd);
     if (showEnd) renderEnd();
+    if (showEnd && herna) $("endSecondary").textContent = "Jiná hra";   // Herna: vedle odvety zpět do výběru her
     document.title = canAim() || building() ? "Jsi na tahu · Ježkomet" : picking() ? "Vybíráš ježka · Ježkomet" : ended() && !replay ? "Konec partie · Ježkomet" : "Ježkomet";
   }
   // spodní lišta: ježek v ruce, volba Střelba / Stavba, díly stavby, výběr ježka pro soupeře
@@ -1536,6 +1543,7 @@
   }
   $("endPrimary").addEventListener("click", rematch);
   $("endSecondary").addEventListener("click", () => {
+    if (herna) { doHerny({ typ: "jina-hra" }); return; }
     if (solo) { newGame(); return; }
     if (me && st.win && st.win !== "=" && st.win !== me && !st.old) copy(concedeText(), "Zkopírováno, vlož to do chatu");
     else copyLink();
@@ -1587,7 +1595,7 @@
   document.querySelectorAll("dialog [data-close]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
   document.querySelectorAll("dialog").forEach(d => d.addEventListener("click", e => { if (e.target === d) d.close(); }));
   $("menuBtn").addEventListener("click", () => {
-    $("mResign").hidden = !me || ended(); $("mCopy").hidden = solo;
+    $("mResign").hidden = !me || ended(); $("mCopy").hidden = solo || !!herna; $("mNew").hidden = !!herna;
     $("mNew").textContent = solo ? "Vyzvat soupeře" : "Nová hra s někým jiným";
     openSheet("menuSheet");
   });
@@ -1623,7 +1631,7 @@
   // ---------- naposledy hrané ----------
   function recentRooms() { return attempt(() => JSON.parse(store.get("jp-rooms") || "[]"), []).filter(r => r && /^[0-9a-z]{6,24}$/.test(r.id)); }
   function remember() {
-    if (!room || !st) return;
+    if (!room || !st || herna) return;   // partie z Herny nepatří do „Rozehrané“ (r je pro každou volbu nové)
     const list = recentRooms().filter(r => r.id !== room.id);
     list.unshift({ id: room.id, x: st.x, o: st.o });
     store.set("jp-rooms", JSON.stringify(list.slice(0, 5)));
@@ -1749,6 +1757,75 @@
     startReplay([act], advance(base, res.bodies, BOT, act));
   }
 
+  // ---------- Herna (protokol 1, react-apps/HERNA-PROTOKOL.md) ----------
+  // #herna=1&m=<místnost>&r=<id>&seat=0|1&names=A,B&zaklada=0|1: bez výzvy a setupu. r je vlastní místnost hry (#r.<id>,
+  // dokument jezkomet-<r>/hra). Vazba je pevná: sedadlo 0 = tým x (names[0]), sedadlo 1 = tým o (names[1]), takže vitez = 0 | 1 | null.
+  // zaklada=1 dokument založí (mapa, modifikátor ze seedu, kdo začíná losem), zaklada=0 čeká, až vznikne, a sedne si na své místo.
+  // Zprávy rodiči: pripraveno, stav (ceka | hraje | konec), vysledek (partie "<r>:<id partie>", jednou za partii), jina-hra.
+  function parseHerna(h) {
+    const q = {};
+    for (const kv of h.split("&")) { const i = kv.indexOf("="); if (i > 0) q[kv.slice(0, i)] = kv.slice(i + 1); }
+    if (q.herna !== "1" || !/^[0-9a-z]{6,24}$/.test(q.r || "") || !/^[01]$/.test(q.seat || "")) return null;
+    const nm = (q.names || "").split(",").map(s => attempt(() => decodeURIComponent(s), s).trim().slice(0, 16));
+    return { r: q.r, m: /^[0-9a-z]{1,24}$/.test(q.m || "") ? q.m : "", seat: +q.seat, team: q.seat === "1" ? "o" : "x",
+      names: [nm[0] || "Hráč 1", nm[1] || "Hráč 2"], zaklada: q.zaklada === "1", faze: "", sent: new Set(), log: [] };
+  }
+  function doHerny(z) {
+    if (!herna) return;
+    const m = { herna: 1, ...z };
+    if (TEST) herna.log.push(m);
+    if (window.parent !== window) attempt(() => window.parent.postMessage(m, "*"));
+  }
+  // fáze a výsledek z aktuálního stavu: volá se z render(), posílá jen změny
+  function hernaSync() {
+    if (!herna) return;
+    const seated = view === "play" && !!st && !!me && !!room && room.id === herna.r;
+    const done = seated && ended() && !replay && !acting;
+    const f = !seated || freeSeat() ? "ceka" : done ? "konec" : "hraje";
+    if (f !== herna.faze) { herna.faze = f; doHerny({ typ: "stav", faze: f }); }
+    if (done && !st.old && !herna.sent.has(st.id)) {
+      herna.sent.add(st.id);
+      doHerny({ typ: "vysledek", partie: herna.r + ":" + st.id, vitez: st.win === "x" ? 0 : st.win === "o" ? 1 : null });
+    }
+  }
+  async function hernaOpen(seq) {
+    const H = herna, id = H.r, slot = H.team === "x" ? "sx" : "so";
+    room = { id, v: -1, sx: "", so: "" };
+    doHerny({ typ: "pripraveno" });
+    info(H.zaklada ? "Zakládám partii…" : "Čeká se, až hra naskočí…", H.zaklada ? "" : `${H.names[1 - H.seat]} ji právě zakládá.`, null);
+    for (let tries = 0; ; tries++) {
+      let d = null, err = false;
+      try {
+        d = await loadDoc(id);
+        if (seq !== bootSeq) return;
+        if (!d && H.zaklada) {
+          const g = freshGame(H.names[0], H.names[1], Math.random() < 0.5 ? "x" : "o", "", "", [0, 0], null);
+          const nd = { app: "jezkomet", g: toDoc(g), v: 1, sx: "", so: "", [slot]: device };
+          await saveDoc(id, nd); d = nd;
+        } else if (d && norm(d.g) && d[slot] !== device) {
+          // sednout si na svoje místo: stejný zápis jako „Přijmout výzvu“, jen bez tlačítka (kdo je kdo, ručí Herna)
+          const nd = { ...d, v: d.v + 1, [slot]: device };
+          await saveDoc(id, nd); d = nd;
+        }
+      } catch { err = true; d = null; }
+      if (seq !== bootSeq) return;
+      if (d) {
+        const g = norm(d.g);
+        if (!g) { info("Tuhle partii nejde otevřít.", "Vrať se do Herny a vyber hru znovu.", null); return; }
+        setGame(g); room.v = d.v; room.sx = d.sx || ""; room.so = d.so || "";
+        me = H.team; store.set("jp-r-" + id, me);
+        lastChange = Date.now(); schedule(1500);
+        resetScene();
+        if (st.n > 0 || ended()) bannerFor = st.id;
+        setView("play"); afterChange(false);
+        return;
+      }
+      if (err && tries >= 2) info("Spojení vázne…", "Zkouším to znovu.", null);
+      await new Promise(r => setTimeout(r, tries < 90 ? 1200 : 4000));
+      if (seq !== bootSeq) return;
+    }
+  }
+
   // ---------- start ----------
   function info(title, meta, retry) {
     $("infoTitle").textContent = title;
@@ -1779,6 +1856,10 @@
     clearTimeout(pollT); solo = false; clearTimeout(botNext.t);
     room = null; me = null; busy = false; net = ""; fails = 0; acting = null; replay = null; pickSel = null; aim = null; mode = "shoot"; ghost = null;
     const h = (location.hash || "").replace(/^#/, "");
+    herna = parseHerna(h);
+    // v Herně (iframe) bez odkazů ven: na iPhonu by „celá obrazovka“ vedla na Přidat na plochu
+    $("fsBtn").hidden = $("mFs").hidden = standalone || (!!herna && !fsOK);
+    if (herna) { hernaOpen(seq); return; }
     const r = /^r\.([0-9a-z]{6,24})$/.exec(h);
     if (r) { openRoom(r[1], seq); return; }
     if (h === "solo") { startSolo(null); return; }
@@ -1794,6 +1875,7 @@
       topY: () => Math.min(...st.b.map(b => [toScreen(b.x, JP.aabb(b)[1])]).filter(([p]) => p[0] > 0 && p[0] < cw).map(([p]) => p[1])),
       proj: (x, y) => { const [sx, sy] = toScreen(x, y); const r = cv.getBoundingClientRect(); return [r.left + sx, r.top + sy]; },
       stats: STATS, calm, solo: () => solo,
+      herna: () => herna && { seat: herna.seat, team: herna.team, faze: herna.faze, sent: [...herna.sent], log: herna.log.slice() },
       crit: () => [...CS.values()].filter(s => frameN - s.last <= 3).map(s => ({ t: s.t, k: s.k, fear: +s.fear.toFixed(2), hit: +s.hit.toFixed(2), cheer: +s.cheer.toFixed(2), sad: +s.sad.toFixed(2), startle: +s.startle.toFixed(2) })),
       sling: () => { const [x, y] = toScreen(SLING[me].x, SLING[me].y); const r = cv.getBoundingClientRect(); return [r.left + x, r.top + y]; },
       ghost: () => ghost && { ...ghost, screen: JPT.proj(ghost.x, ghost.y) },

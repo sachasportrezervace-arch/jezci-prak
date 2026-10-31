@@ -23,6 +23,15 @@ Tahová fyzikální prakovačka 1v1 pro dva na jednom odkazu, bez účtů. Kře�
 - Synchronizace jako Psaníčko: mantledb.sh `jezkomet-<id>/hra`, odkaz `#r.<id>`, počítadlo `v` proti souběžným zápisům, dotazování 1,5 s po tahu, pak řidčeji. Limit dokumentu MantleDB ověřen: 60 kB projde, 120 kB vrací 413.
 - Postavičky, ježek, kostky i krajina jsou kreslené kódem, žádné cizí obrázky. Přehled všech výrazů: `tools/sprites.html` (přes `node tools/serve.cjs`).
 
+## Herna (místnost pro dva)
+Hra umí protokol Herny verze 1 (`react-apps/HERNA-PROTOKOL.md`), ohlášení `<meta name="herna-protokol" content="1">` v `index.html`.
+- Adresa: `…/jezci-prak/#herna=1&m=<místnost>&r=<id>&seat=0|1&names=A,B&zaklada=0|1`. `r` je vlastní místnost hry (dokument `jezkomet-<r>/hra`). Bez výzvy a setupu: `zaklada=1` dokument založí se jmény z `names` (mapa a modifikátor ze seedu, kdo začíná losem, bez sázky), `zaklada=0` ukáže „Čeká se, až hra naskočí“, dotazuje se a pak si sedne. Vazba je pevná: sedadlo 0 = tým x (`names[0]`), sedadlo 1 = tým o (`names[1]`), bez ohledu na to, kdo zakládal.
+- Zakladatel nemíří, dokud si soupeř nesedne („Čeká se, až si … sedne ke hře.“), aby se jeho tah nepřepsal zápisem soupeřova sednutí.
+- Skryté: sdílení odkazu, „Zkopírovat odkaz“, „Nová hra s někým jiným“, „Uznat porážku“ (kopírování do chatu), na iPhonu „Celá obrazovka“ (vedla by na Přidat na plochu). Partie z Herny se nezapisují do „Rozehrané“. Odveta, série, tituly a modifikátory zůstávají.
+- Zprávy rodiči (`postMessage({herna:1,…}, "*")`, jen v iframe): `pripraveno`; `stav` `ceka` (načítání / soupeř nesedí) → `hraje` → `konec` (po dopřehrání posledního tahu); `vysledek` jednou za partii s `partie: "<r>:<id partie>"` (stejné v obou oknech) a `vitez` 0 | 1 | `null` (remíza); `jina-hra` z tlačítka „Jiná hra“ vedle odvety na konci partie.
+- Bez platného `herna=1` (+ `r` `[0-9a-z]{6,24}`, `seat` 0|1) se hra chová jako dřív.
+- Test: `node tests/herna.cjs [URL]` – maketa rodiče (lišta 48 px + iframe, stejný origin přes `page.route`), Chromium desktop + WebKit iPhone 13.
+
 ## Testy
 - `node tests/tune.cjs` – stabilita pevností, rozložení výsledků výstřelů pro každý druh ježka (král jednou ranou 0 %), determinismus přehrání, limit klíčových snímků.
 - `node tests/gen.cjs` – generátor pevností: 200 seedů, úspěšnost do 3 pokusů, mapy a modifikátory.
@@ -31,4 +40,5 @@ Tahová fyzikální prakovačka 1v1 pro dva na jednom odkazu, bez účtů. Kře�
 - `node tests/playtest.cjs [URL]` – 3 partie za sebou přes odvetu v reálném čase (desktop + iPhone 390×844 celou dobu na výšku) s „lidskou“ chybou míření (±4°, ±6 %), mířením 4–8 s a výběrem ježka 2–4 s na výstřel, měří délku partie, časy tahů a čekání, ukládá screenshoty (`tests/shots-play`).
 - `node tests/cam-video.cjs [URL]` – krátká videa kamery (iPhone na výšku a desktop, tři výstřely, za letu převzetí kamery) do `tests/shots-cam/` (webm, potřebuje ffmpeg).
 - `node tests/playtest-sim.cjs [n]` – odhad délky partie bez prohlížeče (bot, člověk s chybou, nahodilý hráč).
+- `node tests/herna.cjs [URL]` – napojení na Hernu (protokol 1) ve 2 prohlížečích, viz sekce Herna.
 - Lokálně: `node tools/serve.cjs 8823`.
