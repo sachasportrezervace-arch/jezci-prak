@@ -157,14 +157,17 @@
     return { bodies: mirror(st.bodies), sd: seed >>> 0, tries: 13, fallback: true, F: lay.F, king: lay.king, ms: Date.now() - t0, maxD: st.maxD };
   }
 
-  // mapa a modifikátor partie ze seedu; odveta (prev) dostane jinou mapu a jiný modifikátor než předchozí partie
+  // mapa a modifikátor partie ze seedu; prev = předchozí partie ({map, md} nebo pole posledních dvou):
+  // nová partie nedostane žádnou z jejich map ani modifikátorů, takže 3 partie za sebou se vždy liší
   const MAP_IDS = ["h", "u", "p", "s"];
   const MODS = [["", 28], ["v", 22], ["n", 16], ["i", 16], ["g", 18]];
   function setup(seed, prev) {
     const rnd = mulberry32(seed ^ 0x9E3779B9);
+    const past = (Array.isArray(prev) ? prev : [prev]).filter(Boolean).slice(0, 2);
+    const noMap = new Set(past.map(q => q.map)), noMd = new Set(past.map(q => q.md || ""));
     let map = MAP_IDS[Math.floor(rnd() * 4)], md = pick(rnd, MODS);
-    if (prev && prev.map === map) map = MAP_IDS[(MAP_IDS.indexOf(map) + 1 + Math.floor(rnd() * 3)) % 4];
-    if (prev && prev.md === md) md = pick(rnd, MODS.filter(m => m[0] !== md));
+    if (noMap.has(map)) { const ok = MAP_IDS.filter(m => !noMap.has(m)); map = ok[Math.floor(rnd() * ok.length)]; }
+    if (noMd.has(md)) md = pick(rnd, MODS.filter(m => !noMd.has(m[0])));
     const wd = md === "v" ? (rnd() < 0.5 ? -1 : 1) * (1 + Math.floor(rnd() * 3)) : 0;
     return { sd: seed >>> 0, map, md, wd };
   }

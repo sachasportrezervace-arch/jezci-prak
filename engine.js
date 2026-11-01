@@ -321,7 +321,7 @@
       if (hog && wind) Body.setVelocity(hog, { x: hog.velocity.x + wind, y: hog.velocity.y });   // vítr fouká jen do ježka
       Engine.update(engine, 1000 / 60);
       tick++;
-      if (bounce && hog) {
+      if (bounce && !bounce.done && hog) {
         // odraz od Tlusťocha: tečná složka zůstane, normálová = −0,8× původní
         const { nx, ny, vn, vx, vy } = bounce, tx = vx - vn * nx, ty = vy - vn * ny;
         Body.setVelocity(hog, { x: tx - T_BOUNCE * vn * nx, y: ty - T_BOUNCE * vn * ny });
@@ -476,7 +476,8 @@
 
   // ---------- pravidla partie (čisté funkce nad stavem, sdílí je hra i simulace v testech) ----------
   // turns: tahů na hráče; builds: zásoba staveb [začínající, druhý]; buildFrom: stavět nejdřív v tomto tahu hráče
-  const RULES = { turns: 8, builds: [3, 4], buildFrom: 2, comebackKing: 0.35, comebackUnits: 2 };
+  // overtime: liší-li se po 8. tahu králové nejvýš o tolik životů, každý hraje ještě jeden tah (prodloužení, jen jednou)
+  const RULES = { turns: 8, builds: [3, 4], buildFrom: 2, comebackKing: 0.35, comebackUnits: 2, overtime: 12 };
   const other = t => t === "x" ? "o" : "x";
   const kingFrac = (bs, t) => { const k = kingOf(bs, t); return k ? Math.max(0, k.hp) / KING_HP : 0; };
   const turnNo = n => Math.floor(n / 2) + 1;                       // kolikátý tah má hráč na tahu (n = počet odehraných akcí)
@@ -496,8 +497,10 @@
     if (!kb && !ko) return { win: "=", wy: "k" };
     if (!ko) return { win: by, wy: "k" };
     if (!kb) return { win: other(by), wy: "k" };
-    if (n >= RULES.turns * 2) return limitWinner(bs);
-    return null;
+    const L = RULES.turns * 2;
+    if (n === L) return Math.abs(kb.hp - ko.hp) <= RULES.overtime ? null : limitWinner(bs);   // těsně → prodloužení
+    if (n >= L + 2) return limitWinner(bs);
+    return null;                                                                              // n = L + 1 jen v prodloužení
   }
   // prohrává tým výrazně? (král o 35 % slabší, nebo o 2 jednotky méně) → jednou za partii stavba navíc
   const behind = (bs, t) => kingFrac(bs, t) <= kingFrac(bs, other(t)) - RULES.comebackKing || alive(bs, t) <= alive(bs, other(t)) - RULES.comebackUnits;

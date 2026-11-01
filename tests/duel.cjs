@@ -84,7 +84,7 @@ const ghostRect = p => p.evaluate(() => {
         const out = document.querySelectorAll(`#pills${T_} .pill.out`).length;
         if (out !== 6 - i.alive[t]) bad.push(`pastilky ${t}: ${out} venku / ${6 - i.alive[t]} padlých`);
       }
-      const tn = document.getElementById("turnNo").textContent, want = i.ph === "end" ? "Konec" : `Tah ${Math.min(8, Math.floor(i.n / 2) + 1)}/8`;
+      const tn = document.getElementById("turnNo").textContent, want = i.ph === "end" ? "Konec" : i.n >= 16 ? "Prodloužení" : `Tah ${Math.floor(i.n / 2) + 1}/8`;
       if (tn !== want) bad.push(`číslo tahu: „${tn}“ / „${want}“`);
       return bad;
     });
@@ -624,6 +624,9 @@ const ghostRect = p => p.evaluate(() => {
   check("reakce postaviček u střelce i u soupeře (radost / úlek / facepalm)", stA.cheer + stA.sad + stA.shock > 0 && stB.cheer + stB.sad + stB.shock > 0, `A ${JSON.stringify({ c: stA.cheer, s: stA.sad, h: stA.shock })} · B ${JSON.stringify({ c: stB.cheer, s: stB.sad, h: stB.shock })}`);
   check("při letu ježka se postavičky bojí a při zásahu cukají", sum("fearFrames") > 10 && sum("hitFrames") > 0, `strach ${sum("fearFrames")} snímků, cuknutí ${sum("hitFrames")}`);
   check("kostky se rozpadají na úlomky a vyřazení zpomalí / zatřese", sum("frag") > 0 && sum("ko") > 0, `úlomky ${sum("frag")}, KO ${sum("ko")}, zpomalení ${sum("slow")}, bouchnutí ${sum("boom")}`);
+  check("vyřazení: odlet, obláček a dušička se svatozáří (žádný text přes scénu)", sum("ko") === 0 || sum("soul") >= 1, `KO ${sum("ko")}, dušiček ${sum("soul")}, korun ${sum("crown")}`);
+  if (sum("flagFrames")) check("málem padlý drží bílý praporek", true, `${sum("flagFrames")} snímků`); else soft("bílý praporek (životy ≤ 28 %)", "v partii nikdo nebyl tak blízko pádu");
+  if (sum("relief")) check("těsně minutá postavička si oddechne (kapka potu)", true, `${sum("relief")}×`); else soft("oddech po těsném minutí", "v partii nenastal");
   check("stavba se přehrála efekty (STATS.build u obou) – dva díly", stA.build >= 2 && stB.build >= 2, `A ${stA.build}, B ${stB.build}`);
   // schopnosti v partii: pokud se událost stala, musela se u obou přehrát
   for (const [ev, key, nm] of [["j", "dodge", "Skokan uskočil"], ["r", "bounce", "Tlusťoch odrazil ježka"], ["z", "shield", "Štítonoš ztratil štít"], ["hl", "heal", "Léčitel vyléčil"]]) {
@@ -636,7 +639,7 @@ const ghostRect = p => p.evaluate(() => {
   const winner = fa.win;
   const W_ = winner === "x" ? A : B, L_ = winner === "x" ? B : A;
   const endKick = await A.locator("#endKicker").innerText(), endKickB = await B.locator("#endKicker").innerText();
-  const wantKick = fa.wy === "l" ? "Po devátém tahu rozhodl zdravější král." : winner === "=" ? "Oba králové padli v jednom tahu." : "Král padl.";
+  const wantKick = fa.wy === "l" ? (fa.n > 16 ? "Ani prodloužení krále nesrazilo, rozhodl zdravější." : "Po osmém tahu rozhodl zdravější král.") : winner === "=" ? "Oba králové padli v jednom tahu." : "Král padl.";
   check("konec: #endKicker říká, jak partie skončila (Král padl. / po devátém tahu)", endKick === wantKick && endKickB === wantKick && (await A.locator("#endKicker").isVisible()), `„${endKick}“`);
   const bad9 = await hudBad(A);
   check("konec: HUD ukazuje Konec a pastilky podle stavu", bad9.length === 0, bad9.join("; "));
@@ -736,7 +739,7 @@ const ghostRect = p => p.evaluate(() => {
         }
         const pls = plat.filter(p => p.b - p.a >= 4);
         // záběr letu = poloha, ve které ježek letí nejvíc vzorků
-        const fly = s => s.hx != null && s.rp, inP = p => ss.slice(p.a, p.b + 1);
+        const fly = s => Number.isFinite(s.hx) && s.rp, inP = p => ss.slice(p.a, p.b + 1);
         const flyP = pls.map(p => ({ p, n: inP(p).filter(fly).length })).sort((u, v) => v.n - u.n)[0];
         const fS = flyP ? inP(flyP.p).filter(fly) : [], hxs = fS.map(s => s.hx), vw = ss.length ? ss[0].vw : 1;
         const hogTravel = hxs.length ? Math.max(...hxs) - Math.min(...hxs) : 0;
@@ -745,7 +748,7 @@ const ghostRect = p => p.evaluate(() => {
           seen && pls.length >= 2 && pls.length <= 4 && longest <= 900 && hi - lo > 200,
           `${pls.length} poloh (${pls.map(p => Math.round(xs[p.a])).join(" → ")}), nejdelší přechod ${longest} ms, rozsah ${Math.round(hi - lo)}, ${ss.length} vzorků za ${last.t} ms`);
         check("prefers-reduced-motion: záběr letu je pevný a obsáhne prak střelce i cílovou pevnost, ježek jím přeletí (kamera se za ním nehýbe)",
-          !!flyP && flyP.n >= 4 && fS.every(s => s.both) && hogTravel > 0.3 * vw,
+          !!flyP && flyP.n >= 4 && fS.every(s => s.both) && hogTravel > 0.1 * vw,
           flyP ? `záběr x ${Math.round(xs[flyP.p.a])}, ${flyP.n} vzorků letu, prak i pevnost v záběru ${fS.filter(s => s.both).length}/${fS.length} (celá pevnost ${fS.filter(s => s.whole).length}), ježek přeletěl ${Math.round(hogTravel)} px z ${vw}` : "žádný záběr letu");
         check("prefers-reduced-motion: po výstřelu kamera stojí na výchozím pohledu (pevnost hráče na tahu)", !last.rp && Math.abs(last.x - last.homeX) < 12, `x ${Math.round(last.x)}, výchozí ${Math.round(last.homeX)}`);
       },

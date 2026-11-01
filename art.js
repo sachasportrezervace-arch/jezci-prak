@@ -596,12 +596,26 @@
     c.fillStyle = "rgba(255,255,255,.55)"; c.fillRect(-1.8, -6.4, 2.2, 3.2);
     c.restore();
   }
+  // bílý praporek: jednotka málem padla, drží ho na straně od soupeře a vlaje jím (svět, střed jednotky = 0,0)
+  function whiteFlag(c, kind, p, lw) {
+    const D = DIMS[kind], hw = D.r || D.w / 2, s = p.dir, x = -s * (hw + 4), y0 = (D.r || D.h / 2) * 0.3, top = TOP[kind] - 2;
+    const w = p.still ? 0 : Math.sin(p.t * 9);
+    c.beginPath(); c.moveTo(x, y0); c.lineTo(x, top); stroke(c, lw * 2, INK);
+    c.beginPath(); c.moveTo(x, y0); c.lineTo(x, top); stroke(c, lw * 0.9, "#B8763F");
+    c.beginPath(); c.moveTo(x, top);
+    c.bezierCurveTo(x - s * 6, top - 2 + w * 1.6, x - s * 12, top + 2 - w * 1.6, x - s * 18, top + w * 2.2);
+    c.lineTo(x - s * 18, top + 12 + w * 2.2);
+    c.bezierCurveTo(x - s * 12, top + 14 - w * 1.6, x - s * 6, top + 10 + w * 1.6, x, top + 12);
+    c.closePath(); fillStroke(c, "#FFF8EA", lw * 0.7);
+    ell(c, x, y0 - 7, 4.2, 4.8); fillStroke(c, p.col, lw * 0.7);
+  }
   function drawUnit(c, kind, team, lw, o = {}) {
     if (!DIMS[kind]) kind = "C";
     const T = TEAM[team] || TEAM.x, tm = TEAM[team] ? team : "x", dir = tm === "x" ? 1 : -1, p = mood(o, T, dir);
     p.team = tm;
     c.save();
     if (p.trem) c.translate(p.trem, 0);
+    else if (o.flag && !p.still && !p.ko) c.translate(Math.sin(p.t * 47) * 0.7, 0);   // málem padl: kolena se třesou
     if (o.heal > 0) aura(c, kind, o, p);
     if (kind === "S") drawS(c, T, lw, p, tm, o);
     else {
@@ -645,8 +659,9 @@
       else owlBase(c, T, l, p, owlGeo(kind, dir), H);
       c.restore();
     }
-    // vznášející se „+“ a hvězdičky nad hlavou
+    // vznášející se „+“ a hvězdičky nad hlavou, bílý praporek „málem padl“
     if (!p.plain) {
+      if (o.flag && !p.ko) whiteFlag(c, kind, p, lw);
       if (o.heal > 0) healPlus(c, kind, o, p, lw);
       if (p.dizzy || p.ko) {
         const top = TOP[kind];
@@ -847,5 +862,5 @@
     rrect(c, -w / 2, -h / 2, w, h, rad); stroke(c, lw);
   }
 
-  window.ART = { INK, TEAM, drawUnit, drawCritter, drawHog, drawBlock, MATCOL, crown, star, circle, stroke, rrect, rng };
+  window.ART = { INK, TEAM, drawUnit, drawCritter, drawHog, drawBlock, MATCOL, crown, star, sweat, circle, stroke, rrect, rng };
 })();

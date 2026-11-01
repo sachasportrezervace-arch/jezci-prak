@@ -170,7 +170,7 @@
       // let: střed před ježkem ve směru letu, zoom podle rychlosti a výšky, svislý posun, když ježek vyletí nad horní okraj
       const s = Math.max(c.overview(), base * (1 - 0.22 * clamp(0.55 * speedN + 0.45 * heightN, 0, 1)));
       const x = xl;
-      const ay = anchorAt(s), margin = 130;
+      const ay = anchorAt(s), margin = clamp(ch * 0.24, 130, 200);   // ježek drží pod pásem HUD (desktop ~200 px)
       const y = clamp((margin - ay) / s - (yl - GY - 70), 0, 600);
       hadHog = true; holdX = x; holdS = base;
       holdT = 1.25;

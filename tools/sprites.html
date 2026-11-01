@@ -34,7 +34,7 @@ const base = t => ({ ...face(t) });
 
 // 1) všechny stavy pro všechny jednotky a oba týmy
 const STATES = [["klid", {}], ["mrk", { blink: 1 }], ["strach", { fear: .9, lookX: 1 }], ["úlek", { startle: 1 }], ["zásah", { hit: 1, hurt: .35 }],
-  ["zranění .35", { hurt: .35 }], ["zranění .6", { hurt: .6, sad: .3 }], ["zranění .9", { hurt: .9 }], ["radost", { cheer: 1 }], ["smutek", { sad: 1 }], ["KO", { ko: true, hurt: 1 }]];
+  ["zranění .35", { hurt: .35 }], ["zranění .6", { hurt: .6, sad: .3 }], ["zranění .9", { hurt: .9 }], ["málem padl", { hurt: .8, flag: 1 }], ["radost", { cheer: 1 }], ["smutek", { sad: 1 }], ["KO", { ko: true, hurt: 1 }]];
 {
   const CW = 114, RH = 118, LX = 96, S1 = 1.4;
   const c = sheet("Jednotky × stavy", "Řádky: druh a tým (x Křečci, o Sovičky). Sloupce: výrazy a zranění.", LX + CW * STATES.length + 10, RH * 12 + 28);

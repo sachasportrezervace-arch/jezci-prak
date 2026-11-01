@@ -8,7 +8,7 @@
   const TEST = /[?&]test\b/.test(location.search);
   const mq = matchMedia("(prefers-reduced-motion: reduce)");
   const calm = () => mq.matches;
-  const STATS = { ko: 0, slow: 0, frag: 0, boom: 0, cheer: 0, sad: 0, shock: 0, fearFrames: 0, hitFrames: 0, freeze: 0, dodge: 0, bounce: 0, shield: 0, heal: 0, build: 0 };   // jen pro testy (?test)
+  const STATS = { ko: 0, slow: 0, frag: 0, boom: 0, cheer: 0, sad: 0, shock: 0, fearFrames: 0, hitFrames: 0, freeze: 0, dodge: 0, bounce: 0, shield: 0, heal: 0, build: 0, relief: 0, flagFrames: 0, soul: 0, crown: 0 };   // jen pro testy (?test)
   const { INK, TEAM, drawUnit, drawHog, drawBlock, MATCOL } = ART;
   const outline = (c, lw) => ART.stroke(c, lw);
   const circle = ART.circle, rrect = ART.rrect;
@@ -234,11 +234,17 @@
         if (d < 800) { lx = dx / (d || 1); ly = dy / (d || 1); }
         if (d < 340) ft = (1 - d / 340) * (hog.team === b.t ? 0.45 : 1);
       }
+      // těsně minul (ježek soupeře prolétl do ~100 px a nic neubral): oddech, kapka potu a „fuu“
+      if (hog && hog.team !== b.t) {
+        if (s.pf == null) { s.pf = 0; s.hp0 = b.hp; }
+        s.pf = Math.max(s.pf, ft);
+        if (s.pf > 0.7 && ft < 0.3) { if (b.hp >= s.hp0 - 1.2) relieved(s, b); s.pf = -9; }
+      } else if (s.pf != null) { if (s.pf > 0.7 && b.hp >= s.hp0 - 1.2) relieved(s, b); s.pf = null; }
       s.fear += (ft - s.fear) * Math.min(1, 0.14 * dtf);
       s.lx += (lx - s.lx) * Math.min(1, 0.2 * dtf); s.ly += (ly - s.ly) * Math.min(1, 0.2 * dtf);
       s.hit = Math.max(0, s.hit - dtf / 26); s.startle = Math.max(0, s.startle - dtf / 34);
       s.cheer = Math.max(0, s.cheer - dtf / 100); s.sad = Math.max(0, s.sad - dtf / 100);
-      s.heal = Math.max(0, s.heal - dtf / 110); s.dodge = Math.max(0, s.dodge - dtf / 40);
+      s.heal = Math.max(0, s.heal - dtf / 110); s.dodge = Math.max(0, s.dodge - dtf / 40); s.boing = Math.max(0, (s.boing || 0) - dtf / 50);
       s.blinkIn -= dtf;
       if (s.blinkIn <= 0) { s.blinkT = 7; s.blinkIn = rnd(120, 300); }
       if (s.blinkT > 0) s.blinkT -= dtf;
@@ -254,7 +260,9 @@
       heal: s.heal > 0 ? Math.min(1, s.heal * 2) : 0, dodge: s.dodge,
     };
     if (b.k === "S") o.shield = clamp((b.z || 0) / UNIT.S.z, 0, 1);
-    const breath = M ? 1 + Math.sin(animT * 2.4 + s.ph) * 0.016 : 1, sq = M ? s.hit * 0.13 : 0;
+    if (o.hurt >= 0.72) { o.flag = 1; STATS.flagFrames++; }   // málem padl: bílý praporek
+    const jig = M && s.boing > 0 ? Math.sin((1 - s.boing) * 34) * s.boing * 0.2 : 0;   // Tlusťoch se po odrazu ježka zavlní
+    const breath = M ? 1 + Math.sin(animT * 2.4 + s.ph) * 0.016 : 1, sq = (M ? s.hit * 0.13 : 0) + jig;
     const hop = M ? -(o.cheer > 0 ? Math.abs(Math.sin(animT * 9 + s.ph)) * 9 * Math.min(1, s.cheer * 2) : 0) - s.startle * 3 : 0;
     return { o, rot: s.rot, dy: hop, sx: breath * (1 + sq), sy: breath * (1 - sq) };
   }
@@ -530,14 +538,21 @@
     if (m === "w" && !calm()) for (let i = 0; i < 4 && parts.length < MAXP; i++) parts.push({ x: bi.x + (Math.random() - 0.5) * K.w, y: bi.y, vx: (Math.random() - 0.5) * 6, vy: -2 - Math.random() * 4, life: 0, max: 60 + Math.random() * 30, k: "frag", pts: [[-8, -1.2], [8, -1.2], [8, 1.2], [-8, 1.2]], c: cols[1], glass: false, r: Math.random() * 3, vr: (Math.random() - 0.5) * 0.6, sz: 1 });
     burst(bi.x, bi.y, m === "g" || m === "i" ? m : "z", m === "s" || m === "m" ? 10 : 5, 0.8);
   }
-  const words = ["Au!", "Jau!", "Ouha!", "Fuj!", "Ajaj!"];
-  function floatText(x, y, text, c, sz = 34, vy = -1.1, max = 80) { parts.push({ x, y, vx: 0, vy, life: 0, max, k: "text", c, text, sz, r: 0, vr: 0 }); }
+  // vyřazení: postavička odletí v oblouku, „puf“ obláček a z něj vystoupá dušička se svatozáří; králi napřed odletí koruna
   function koFx(x, y, team, kind) {
     burst(x, y, "c", 8, 1.1);
     const dir = x > W / 2 ? 1 : -1;
     puff.push({ x, y, team, kind: kind || "C", life: 0, vx: dir * (1.4 + Math.random()), vy: -8.6, rot: 0, vr: dir * 0.2 });
     if (!calm()) for (let i = 0; i < 5; i++) parts.push({ x, y: y - 10, vx: (i - 2) * 1.5, vy: -4 - Math.random() * 2, life: 0, max: 60, k: "star", c: "#FFE27A", sz: 9, r: 0, vr: 0.1 });
-    floatText(x, y - 34, kind === "K" ? "Král padl!" : words[(x | 0) % words.length], TEAM[team].c, kind === "K" ? 44 : 34, -1.1, kind === "K" ? 120 : 80);
+    if (kind === "K") { parts.push({ x, y: y - 26, vx: -dir * 2.6, vy: -10.5, life: 0, max: 170, k: "crown", c: "", sz: 1.25, r: 0, vr: -dir * 0.22 }); STATS.crown++; }
+  }
+  // těsně minul: kapka potu odletí od hlavy, z pusy obláček „fuu“, úsměv úlevy
+  function relieved(s, b) {
+    const dir = s.t === "x" ? 1 : -1, hw = UNIT[b.k].r || UNIT[b.k].w / 2, hh = halfH(b.k);
+    s.cheer = Math.max(s.cheer, 0.22); s.sad = 0; s.startle = 0; STATS.relief++;
+    if (parts.length >= MAXP - 2) return;
+    parts.push({ x: s.x - dir * hw * 0.55, y: s.y - hh * 0.75, vx: -dir * 2.4, vy: -3.4, life: 0, max: 42, k: "drop", c: "", sz: 1.5, r: 0, vr: -dir * 0.06 });
+    parts.push({ x: s.x + dir * hw * 0.95, y: s.y - hh * 0.05, vx: dir * 1.6, vy: -0.35, life: 0, max: 30, k: "puffball", c: "#fff", sz: 5, r: 0, vr: 0 });
   }
   function boomFx(e) {
     STATS.boom++;
@@ -550,7 +565,19 @@
   function puffOut(p) {
     for (let i = 0; i < (calm() ? 5 : 9) && parts.length < MAXP; i++) { const a = i / 9 * TAU, v = 1.2 + Math.random() * 1.6; parts.push({ x: p.x, y: p.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.4, life: 0, max: 30 + Math.random() * 10, k: "puffball", c: "#fff", sz: 8 + Math.random() * 6, r: 0, vr: 0 }); }
     if (!calm()) for (let i = 0; i < 4; i++) parts.push({ x: p.x, y: p.y, vx: (i - 1.5) * 1.6, vy: -2.4 - i * 0.3, life: 0, max: 46, k: "star", c: "#FFE27A", sz: 8, r: 0, vr: 0.12 });
-    floatText(p.x, p.y - 8, "puf", "#fff", 26, -0.7, 50);
+    parts.push({ x: p.x, y: p.y - 6, vx: 0, vy: -1.05, life: 0, max: calm() ? 70 : 110, k: "soul", c: TEAM[p.team].belly, sz: p.kind === "K" ? 1.25 : p.kind === "T" ? 1.15 : p.kind === "R" ? 0.8 : 1, r: 0, vr: 0, x0: p.x, ph: Math.random() * TAU });
+    STATS.soul++;
+  }
+  // dušička: bílé tělíčko s vlnitým spodkem, spokojeně zavřená očka, křidélka a svatozář (žádné kříže ani nic smutného)
+  function drawSoul(p, lw) {
+    const u = p.life / p.max, flap = calm() ? 0 : Math.sin(p.life * 0.35) * 0.35;
+    ctx.globalAlpha = Math.min(1, (1 - u) * 2.2) * 0.92; ctx.scale(p.sz, p.sz);
+    for (const s of [-1, 1]) { ctx.save(); ctx.translate(s * 12, -2); ctx.rotate(s * (-0.5 + flap)); ART.rrect(ctx, s < 0 ? -12 : 0, -4, 12, 9, 4.5); ctx.fillStyle = "#fff"; ctx.fill(); outline(ctx, lw * 0.55); ctx.restore(); }
+    ctx.beginPath(); ctx.moveTo(-12, 10); ctx.lineTo(-12, -4); ctx.arc(0, -4, 12, Math.PI, 0); ctx.lineTo(12, 10);
+    for (let i = 0; i < 3; i++) ctx.quadraticCurveTo(12 - i * 8 - 4, 15 + (calm() ? 0 : Math.sin(p.life * 0.3 + i) * 2), 12 - (i + 1) * 8, 10);
+    ctx.closePath(); ctx.fillStyle = p.c; ctx.fill(); outline(ctx, lw * 0.6);
+    for (const s of [-1, 1]) { ctx.beginPath(); ctx.arc(s * 4.6, -4.2, 2.6, Math.PI * 1.1, Math.PI * 1.9); ART.stroke(ctx, 1.8); }
+    ctx.beginPath(); ctx.ellipse(0, -21, 8, 2.6, 0, 0, TAU); ctx.lineWidth = 4.4; ctx.strokeStyle = ART.INK; ctx.stroke(); ctx.lineWidth = 2.4; ctx.strokeStyle = "#FFC83D"; ctx.stroke();
   }
   function drawParticles(lw) {
     for (const p of puff) {
@@ -558,8 +585,11 @@
       drawUnit(ctx, p.kind, p.team, lw, { ko: true, hurt: 1, t: animT, still: calm(), plain: true }); ctx.restore();
     }
     for (const p of parts) {
-      const al = p.k === "frag" ? Math.min(1, (1 - p.life / p.max) * 3) : 1 - p.life / p.max;
+      const al = p.k === "frag" || p.k === "crown" ? Math.min(1, (1 - p.life / p.max) * 3) : 1 - p.life / p.max;
       ctx.save(); ctx.globalAlpha = Math.max(0, al); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+      if (p.k === "soul") { drawSoul(p, lw); ctx.restore(); continue; }
+      if (p.k === "crown") { ART.crown(ctx, 0, 7, p.sz, lw, false); ctx.restore(); continue; }
+      if (p.k === "drop") { ART.sweat(ctx, 0, 0, p.sz, lw); ctx.restore(); continue; }
       if (p.k === "chip") { ctx.fillStyle = p.c; ctx.fillRect(-p.sz / 2, -p.sz / 5, p.sz, p.sz / 2.5); ctx.strokeStyle = INK; ctx.lineWidth = lw * 0.4; ctx.strokeRect(-p.sz / 2, -p.sz / 5, p.sz, p.sz / 2.5); }
       else if (p.k === "frag") { ctx.beginPath(); p.pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); ctx.fillStyle = p.c; ctx.fill(); ctx.strokeStyle = p.glass ? "rgba(43,22,56,.6)" : INK; ctx.lineWidth = lw * 0.55; ctx.lineJoin = "round"; ctx.stroke(); }
       else if (p.k === "dust") { circle(ctx, 0, 0, p.sz * (0.6 + p.life / p.max)); ctx.fillStyle = p.c; ctx.fill(); }
@@ -567,14 +597,14 @@
       else if (p.k === "star") { ART.star(ctx, 0, 0, p.sz, p.c, lw * 0.5); }
       else if (p.k === "puffball") { circle(ctx, 0, 0, p.sz * (0.5 + 0.9 * p.life / p.max)); ctx.fillStyle = p.c; ctx.fill(); outline(ctx, lw * 0.6); }
       else if (p.k === "ring") { const u = p.life / p.max, r = p.sz * (1 - (1 - u) ** 3); circle(ctx, 0, 0, r); ctx.fillStyle = p.c === "#7FE3D9" ? "rgba(127,227,217,.22)" : "rgba(255,210,60,.28)"; ctx.fill(); ctx.lineWidth = lw * (1.6 - u); ctx.strokeStyle = p.c === "#7FE3D9" ? "#1FA9A3" : "#FF8A2A"; ctx.stroke(); }
-      else if (p.k === "text") { ctx.rotate(-p.r); ctx.font = `${p.sz}px "Titan One", sans-serif`; ctx.textAlign = "center"; ctx.lineWidth = 7; ctx.strokeStyle = INK; ctx.lineJoin = "round"; ctx.strokeText(p.text, 0, 0); ctx.fillStyle = p.c; ctx.fillText(p.text, 0, 0); }
       ctx.restore();
     }
   }
   function stepParticles() {
     for (const p of parts) {
       p.life++;
-      if (p.k === "text" || p.k === "ring") { p.y += p.vy; p.x += p.vx; continue; }
+      if (p.k === "ring") { p.y += p.vy; p.x += p.vx; continue; }
+      if (p.k === "soul") { p.y += p.vy; p.x = p.x0 + (calm() ? 0 : Math.sin(p.life * 0.07 + p.ph) * 9); continue; }
       p.vy += p.k === "puffball" ? 0.04 : 0.25; p.vx *= p.k === "puffball" ? 0.93 : 0.98; p.x += p.vx; p.y += p.vy; p.r += p.vr;
       if (p.y > GY - 2 && p.k !== "dust" && p.k !== "puffball") { p.y = GY - 2; p.vy *= -0.3; p.vx *= 0.7; p.vr *= 0.6; }
     }
@@ -624,18 +654,18 @@
     } else if (e.type === "n") { if (!quiet) sfx.drop(); burst(e.x, e.y + 10, "z", 8, 0.7); STATS.build++; }
     else if (e.type === "j") {
       const s = CS.get(e.id); STATS.dodge++;
-      if (s) { s.dodge = 1; s.startle = 1; floatText(s.x, s.y - 30, "hop!", "#FFE27A", 26, -1.3, 60); }
+      if (s) { s.dodge = 1; s.startle = 1; burst(s.x, s.y + halfH(s.k), "z", 7, 0.7); }
       if (!quiet) sfx.hop();
     } else if (e.type === "r") {
       STATS.bounce++;
       parts.push({ x: e.x, y: e.y, vx: 0, vy: 0, life: 0, max: 22, k: "ring", sz: 60, c: "#7FE3D9", r: 0, vr: 0 });
-      floatText(e.x, e.y - 40, "boing", "#7FE3D9", 28, -1.2, 55);
+      nearCritters(e.x, e.y, 60, s => { if (s.k === "T") s.boing = 1; });
       if (!quiet) sfx.boing();
       if (!calm()) shake = Math.max(shake, 5);
     } else if (e.type === "z") {
       STATS.shield++;
       const s = CS.get(e.id);
-      if (s) { burst(s.x + (s.t === "x" ? 18 : -18), s.y, "b", 8, 0.9); if (e.z <= 0) floatText(s.x, s.y - 44, "Štít praskl", "#9FD3FF", 22, -1, 70); }
+      if (s) { burst(s.x + (s.t === "x" ? 18 : -18), s.y, "b", 8, 0.9); if (e.z <= 0) { burst(s.x + (s.t === "x" ? 20 : -20), s.y, "w", 14, 1.3); s.startle = 1; } }
       if (!quiet) sfx.clank();
     }
   }
@@ -646,15 +676,14 @@
       let delay = 0;
       for (const [hid, tid] of a.hl) {
         setTimeout(() => {
-          const h = CS.get(hid), t = CS.get(tid), b = st && st.b.find(q => q.id === tid);
+          const h = CS.get(hid), t = CS.get(tid);
           if (h) h.heal = 1; if (t) { t.heal = 1; t.cheer = Math.max(t.cheer, 0.3); }
-          const prev = a.hlFrom && a.hlFrom[tid];
-          if (b) floatText(b.x, b.y - halfH(b.k) - 14, "+" + (prev != null ? b.hp - prev : JP.HEAL.amount), "#2FBF71", 30, -1, 80);
           STATS.heal++; sfx.heal();
         }, delay);
         delay += calm() ? 0 : 260;
       }
     }
+    if (st && st.n === RULES.turns * 2 && st.ph !== "end" && !st.win) notice("Prodloužení! Králové jsou těsně, každý má ještě jednu ránu.");
     if (a.cb) {
       const who = a.cb, text = me === who ? "Prohráváš: máš jednu stavbu navíc a smíš stavět hned." : `${nameOf(st, who)} prohrává a dostává jednu stavbu navíc.`;
       notice(text);
@@ -1096,20 +1125,32 @@
     const num = (lo, hi) => v => Math.max(lo, Math.min(hi, v | 0));
     return { ...common, rv: 2, n: Math.max(0, g.n | 0), p: g.p, ph: g.ph, win: ["x", "o", "="].includes(g.win) ? g.win : "", wy: ["k", "l", "r"].includes(g.wy) ? g.wy : "",
       b, h, hd: pair(g.hd, v => hogOk(v) ? v : ""), pl: pair(g.pl, poolOk), bs: pair(g.bs, num(0, 6)), lb: pair(g.lb, num(0, 1)), cb: pair(g.cb, num(0, 1)),
-      sd: (g.sd >>> 0) || 0, map: JP.MAPS[g.map] ? g.map : "h", md: ["", "v", "n", "i", "g"].includes(g.md) ? g.md : "", wd: Math.max(-3, Math.min(3, g.wd | 0)) };
+      sd: (g.sd >>> 0) || 0, map: JP.MAPS[g.map] ? g.map : "h", md: ["", "v", "n", "i", "g"].includes(g.md) ? g.md : "", wd: Math.max(-3, Math.min(3, g.wd | 0)),
+      pm: (Array.isArray(g.pm) ? g.pm : []).filter(q => q && JP.MAPS[q.map]).slice(0, 2).map(q => ({ map: q.map, md: ["", "v", "n", "i", "g"].includes(q.md) ? q.md : "" })) };
   }
   // nová partie: zakladatel vygeneruje pevnosti ze seedu (mapa a modifikátor se liší od předchozí partie)
+  // prev = poslední 2 partie [{map, md}] (z dokumentu u odvety, jinak z tohoto zařízení), `pm` je nese do další odvety
+  const pmOf = g => [{ map: g.map, md: g.md }, ...(g.pm || [])].slice(0, 2);
+  const recentGames = () => attempt(() => JSON.parse(store.get("jp-recent") || "[]").filter(q => q && JP.MAPS[q.map]).slice(0, 2), []) || [];
+  let recentId = "";
+  function rememberGame(g) {
+    if (!g || g.old || g.id === recentId) return;
+    recentId = g.id;
+    const list = recentGames().filter(q => q.id !== g.id);
+    store.set("jp-recent", JSON.stringify([{ id: g.id, map: g.map, md: g.md }, ...list].slice(0, 2)));
+  }
   function freshGame(x, o, s, k, kc, w, prev) {
     const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+    prev = (prev && prev.length ? prev : recentGames()).map(q => ({ map: q.map, md: q.md || "" })).slice(0, 2);
     const su = JPFort.setup(seed, prev);
     const fort = JPFort.gen(seed, { ice: su.md === "i", env: su });
     const hd = { x: "", o: "" }; hd[s] = "n";
     const pl = { x: JP.HOG_ORDER, o: JP.HOG_ORDER }; pl[s] = JP.HOG_ORDER.replace("n", "");
     const bs = { x: 0, o: 0 }; bs[s] = RULES.builds[0]; bs[other(s)] = RULES.builds[1];
     return { rv: 2, id: randId(6), x, o, s, k, kc, w, r: "", n: 0, p: s, ph: "t", win: "", wy: "", b: fort.bodies, h: [], hd, pl, bs, lb: { x: 0, o: 0 }, cb: { x: 0, o: 0 },
-      sd: fort.sd, map: su.map, md: su.md, wd: su.wd, tt: { x: JP.rankOf(w[0]), o: JP.rankOf(w[1]) }, t: null };
+      sd: fort.sd, map: su.map, md: su.md, wd: su.wd, pm: prev, tt: { x: JP.rankOf(w[0]), o: JP.rankOf(w[1]) }, t: null };
   }
-  const setGame = g => { st = g; };
+  const setGame = g => { st = g; if (g && g.rv === 2) rememberGame(g); };
   const sig = g => g ? [g.rv, g.id, g.x, g.o, g.s, g.n, g.p, g.ph, g.w.join(":"), g.r, g.k, g.kc, g.hd.x, g.hd.o, g.pl.x, g.pl.o, g.bs.x, g.bs.o, g.lb.x, g.lb.o, g.win].join("|") : "";
 
   async function commit(next, ok, conflictText, base = st) {
@@ -1321,7 +1362,7 @@
     $("score").classList.toggle("solo", solo);
     if (solo) { $("score").textContent = "Trénink"; $("score").setAttribute("aria-label", "Trénink proti botovi, nepočítá se do série"); }
     else { $("score").innerHTML = `<b class="x">${w[0]}</b> : <b class="o">${w[1]}</b>`; $("score").setAttribute("aria-label", `Série ${st.x} ${w[0]}, ${st.o} ${w[1]}`); }
-    $("turnNo").textContent = ended() ? "Konec" : `Tah ${Math.min(RULES.turns, JP.turnNo(st.n))}/${RULES.turns}`;
+    $("turnNo").textContent = ended() ? "Konec" : st.n >= RULES.turns * 2 ? "Prodloužení" : `Tah ${JP.turnNo(st.n)}/${RULES.turns}`;
     const [ml, mt, mk] = modUi(st);
     $("modChip").hidden = !mk || st.old;
     $("hud").classList.toggle("mod", !!mk && !st.old);
@@ -1333,7 +1374,7 @@
     const opp = me ? other(me) : null;
     if (net) s = net;
     else if (ended() && !replay) s = "";
-    else if (acting) s = acting.played ? "Odesílám…" : acting.kind === "s" ? "Letí!" : "Stavíš…";
+    else if (acting) s = acting.played ? "Odesílám…" : acting.kind === "s" ? "" : "Stavíš…";
     else if (replay) { const a = replay.acts[replay.i]; s = a ? (a.kind === "s" ? `${nameOf(st, a.by)} střílí!` : `${nameOf(st, a.by)} staví…`) : ""; }
     else if (busy) s = "Odesílám…";
     else if (hernaHold()) s = "Čeká se na soupeře…";
@@ -1442,7 +1483,7 @@
 
   function renderEnd() {
     const s = stake(st);
-    $("endKicker").textContent = st.old ? "" : st.wy === "l" ? "Po osmém tahu rozhodl zdravější král." : st.wy === "r" ? (st.r && st.r === me ? "Vzdáno." : `${nameOf(st, st.r || other(st.win))} se vzdává.`) : st.win === "=" ? "Oba králové padli v jednom tahu." : "Král padl.";
+    $("endKicker").textContent = st.old ? "" : st.wy === "l" ? (st.n > RULES.turns * 2 ? "Ani prodloužení krále nesrazilo, rozhodl zdravější." : "Po osmém tahu rozhodl zdravější král.") : st.wy === "r" ? (st.r && st.r === me ? "Vzdáno." : `${nameOf(st, st.r || other(st.win))} se vzdává.`) : st.win === "=" ? "Oba králové padli v jednom tahu." : "Král padl.";
     $("endKicker").hidden = !$("endKicker").textContent;
     $("endPrimary").hidden = !me; $("endPrimary").disabled = busy;
     if (st.old) {
@@ -1525,10 +1566,10 @@
 
   // ---------- hraní: odveta, vzdání ----------
   async function rematch() {
-    if (solo) { startSolo({ map: st.map, md: st.md }); return; }
+    if (solo) { startSolo(pmOf(st)); return; }
     if (busy || !me || !ended()) return;
     const starts = st.old ? st.s : st.win === "=" ? other(st.s) : other(st.win);
-    const next = freshGame(st.x, st.o, starts, st.k, st.kc, seriesAfter(), { map: st.map, md: st.md });
+    const next = freshGame(st.x, st.o, starts, st.k, st.kc, seriesAfter(), pmOf(st));
     if (!await commit(next, cur => cur.id === st.id && cur.ph === "end", "Odvetu už mezitím založil soupeř.")) return;
     setGame(next); resetScene();
     afterChange(true);
